@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::components::{GameState, Particle, ScreenShake};
+use crate::components::{GameState, Particle, ScreenShake, TetrominoType};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use ratatui::{
     prelude::*,
@@ -133,7 +133,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(2),  // Title
-            Constraint::Length(10), // Score and next piece
+            Constraint::Length(13), // Stats
+            Constraint::Length(10), // Next piece preview
             Constraint::Min(5),     // Controls
             Constraint::Length(1),  // Bottom border
         ])
@@ -226,6 +227,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
     f.render_widget(current_status, stats_layout[2]);
 
+    // Render next tetromino preview
+    render_next_tetromino(f, app, info_layout[2]);
+
     // Render controls with updated key bindings
     let controls = Paragraph::new(
         "Controls:\n\
@@ -238,7 +242,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
     )
     .block(Block::default().borders(Borders::TOP))
     .wrap(Wrap { trim: true });
-    f.render_widget(controls, info_layout[2]);
+    f.render_widget(controls, info_layout[3]);
 }
 
 /// Calculate the responsive board size based on available area
@@ -420,4 +424,62 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+// Function to render the next tetromino preview
+fn render_next_tetromino(f: &mut Frame, app: &mut App, area: Rect) {
+    // Create a preview box with a title
+    let next_block = Block::default().title("NEXT").borders(Borders::ALL);
+
+    // Get inner area for the preview before rendering the block
+    let inner_area = next_block.inner(area);
+
+    f.render_widget(next_block, area);
+
+    // Get the next tetromino type from game state
+    if let Some(game_state) = app.world.get_resource::<GameState>() {
+        if let Some(next_type) = game_state.next_tetromino {
+            // Get blocks for the tetromino type
+            let blocks = next_type.get_blocks();
+
+            // Calculate size needed for the tetromino
+            let mut min_x = i32::MAX;
+            let mut max_x = i32::MIN;
+            let mut min_y = i32::MAX;
+            let mut max_y = i32::MIN;
+
+            for &(x, y) in &blocks {
+                min_x = min_x.min(x);
+                max_x = max_x.max(x);
+                min_y = min_y.min(y);
+                max_y = max_y.max(y);
+            }
+
+            let width = (max_x - min_x + 1) as u16;
+            let height = (max_y - min_y + 1) as u16;
+
+            // Center the tetromino in the preview area
+            let center_x = inner_area.left() + inner_area.width / 2;
+            let center_y = inner_area.top() + inner_area.height / 2;
+
+            let start_x = center_x - width / 2;
+            let start_y = center_y - height / 2;
+
+            let color = next_type.get_color();
+
+            // Draw the tetromino blocks
+            for &(x, y) in &blocks {
+                let adjusted_x = start_x + (x - min_x) as u16;
+                let adjusted_y = start_y + (y - min_y) as u16;
+
+                if adjusted_x < inner_area.right() && adjusted_y < inner_area.bottom() {
+                    if let Some(cell) = f.buffer_mut().cell_mut((adjusted_x, adjusted_y)) {
+                        cell.set_symbol("█");
+                        cell.set_fg(color);
+                        cell.set_bg(Color::Black);
+                    }
+                }
+            }
+        }
+    }
 }

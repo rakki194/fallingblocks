@@ -22,7 +22,21 @@ pub fn spawn_tetromino(world: &mut World) {
         input.hard_drop_released = was_hard_drop_released;
     }
 
-    let tetromino_type = TetrominoType::random();
+    // Get the next tetromino from game state or generate a random one if none exists
+    let tetromino_type = {
+        let mut game_state = world.resource_mut::<GameState>();
+        game_state
+            .next_tetromino
+            .take()
+            .unwrap_or_else(TetrominoType::random)
+    };
+
+    // Generate the next tetromino for the future
+    {
+        let mut game_state = world.resource_mut::<GameState>();
+        game_state.next_tetromino = Some(TetrominoType::random());
+    }
+
     let tetromino = Tetromino::new(tetromino_type);
 
     // Start position at the top center of the board

@@ -199,6 +199,7 @@ pub struct GameState {
     pub t_spin_count: u32,        // Track total t-spins performed
     pub tetris_count: u32,        // Track total tetris clears
     pub perfect_clear_count: u32, // Track total perfect clears
+    pub next_tetromino: Option<TetrominoType>, // Store the next tetromino to be spawned
 }
 
 impl Default for GameState {
@@ -223,6 +224,7 @@ impl Default for GameState {
             t_spin_count: 0,
             tetris_count: 0,
             perfect_clear_count: 0,
+            next_tetromino: None,
         }
     }
 }

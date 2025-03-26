@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use std::error;
 
-use crate::components::{Board, CoyoteTime, GameState, Input, ScreenShake};
+use crate::components::{Board, CoyoteTime, GameState, Input, ScreenShake, TetrominoType};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::systems::spawn_tetromino;
 
@@ -35,7 +35,8 @@ impl App {
         world.insert_resource(crate::Time::new());
 
         // Initialize game state
-        let game_state = GameState::default();
+        let mut game_state = GameState::default();
+        game_state.next_tetromino = Some(TetrominoType::random());
         world.insert_resource(game_state);
 
         // Initialize screen shake
