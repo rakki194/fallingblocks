@@ -350,7 +350,7 @@ fn handle_hard_drop(world: &mut World) {
 
 pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
     // Log delta seconds for debugging
-    trace!("Game tick with delta: {}", delta_seconds);
+    trace!("Game tick with delta: {delta_seconds}");
 
     // Update particles first, regardless of game state
     particles::update_particles(world, delta_seconds);
@@ -494,7 +494,7 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
 
             // Log how many entities we have for debugging
             let count = entities.iter(world).count();
-            debug!("Found {} tetromino entities", count);
+            debug!("Found {count} tetromino entities");
 
             if let Some((entity, tetromino, position)) = entities.iter(world).next() {
                 tetromino_entity = Some(entity);
@@ -586,7 +586,7 @@ fn handle_piece_lock(
             let cells = board.cells.clone();
             cells
                 .iter()
-                .all(|row| row.iter().all(|cell| cell.is_none()))
+                .all(|row| row.iter().all(std::option::Option::is_none))
         } else {
             false
         };
@@ -597,8 +597,7 @@ fn handle_piece_lock(
     // Update score if needed
     if lines_cleared > 0 {
         info!(
-            "Cleared {} lines (T-spin: {}, Perfect clear: {})",
-            lines_cleared, is_t_spin, is_perfect_clear
+            "Cleared {lines_cleared} lines (T-spin: {is_t_spin}, Perfect clear: {is_perfect_clear})"
         );
 
         let mut game_state = world.resource_mut::<GameState>();

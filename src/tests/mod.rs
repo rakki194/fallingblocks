@@ -19,7 +19,7 @@ pub mod test_utils {
     use bevy_ecs::prelude::*;
 
     // Helper function to create a test world
-    pub fn create_test_world() -> World {
+    #[must_use] pub fn create_test_world() -> World {
         let mut world = World::new();
         world.init_resource::<GameState>();
 
@@ -35,12 +35,12 @@ pub mod test_utils {
     }
 
     // Helper function to create a test app
-    pub fn create_test_app() -> App {
+    #[must_use] pub fn create_test_app() -> App {
         App::new()
     }
 
     // Helper to check if a position is within board bounds
-    pub fn is_within_bounds(pos: &Position) -> bool {
+    #[must_use] pub fn is_within_bounds(pos: &Position) -> bool {
         pos.x >= 0
             && pos.x < crate::game::BOARD_WIDTH as i32
             && pos.y >= 0

@@ -19,7 +19,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let mut world = World::new();
 
         // Register components

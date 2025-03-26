@@ -54,13 +54,12 @@ mod tests {
         }
 
         // Store the initial position
-        let initial_position = app
+        let initial_position = *app
             .world
             .query::<&Position>()
             .iter(&app.world)
             .next()
-            .unwrap()
-            .clone();
+            .unwrap();
 
         // Try to move the tetromino - should not move while paused
         {
@@ -78,13 +77,12 @@ mod tests {
         input_system(&mut app.world);
 
         // Position should not have changed
-        let paused_position = app
+        let paused_position = *app
             .world
             .query::<&Position>()
             .iter(&app.world)
             .next()
-            .unwrap()
-            .clone();
+            .unwrap();
 
         // With our fix to the input_system, the position should not have changed while paused
         assert_eq!(
@@ -107,13 +105,12 @@ mod tests {
         input_system(&mut app.world);
 
         // Position should now change
-        let resumed_position = app
+        let resumed_position = *app
             .world
             .query::<&Position>()
             .iter(&app.world)
             .next()
-            .unwrap()
-            .clone();
+            .unwrap();
 
         // The important part is that the position changed at all after resuming
         assert!(

@@ -11,8 +11,8 @@ mod tests {
         let app = App::new();
 
         // Verify initial state
-        assert_eq!(app.should_quit, false);
-        assert_eq!(app.game_over, false);
+        assert!(!app.should_quit);
+        assert!(!app.game_over);
         assert_eq!(app.score, 0);
         assert_eq!(app.level, 1);
         assert_eq!(app.lines_cleared, 0);
@@ -83,11 +83,11 @@ mod tests {
         assert_eq!(game_state.score, 0);
         assert_eq!(game_state.level, 1);
         assert_eq!(game_state.lines_cleared, 0);
-        assert_eq!(game_state.game_over, false);
+        assert!(!game_state.game_over);
         assert_eq!(game_state.tetris_count, 0);
         assert_eq!(game_state.t_spin_count, 0);
         assert_eq!(game_state.perfect_clear_count, 0);
         assert_eq!(game_state.combo_count, 0);
-        assert_eq!(game_state.back_to_back, false);
+        assert!(!game_state.back_to_back);
     }
 }

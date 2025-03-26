@@ -54,7 +54,7 @@ mod tetromino_tests {
             TetrominoType::Z,
         ];
 
-        for t in types.iter() {
+        for t in &types {
             let tetromino = Tetromino::new(*t);
             assert_eq!(tetromino.tetromino_type, *t);
         }
@@ -73,7 +73,7 @@ mod tetromino_tests {
         let o_tetromino = Tetromino::new(TetrominoType::O);
         let o_blocks_r0 = o_tetromino.get_blocks();
 
-        let mut rotated_o = o_tetromino.clone();
+        let mut rotated_o = o_tetromino;
         rotated_o.rotation = 1; // 90 degrees
         let o_blocks_r90 = rotated_o.get_blocks();
 
@@ -218,7 +218,7 @@ mod board_tests {
         // Check that cells moved down correctly
         // The top row (index 0) is cleared after moving lines down
         for x in 0..board.width {
-            assert_eq!(board.cells[x][0], None, "Cell at ({}, 0) should be None", x);
+            assert_eq!(board.cells[x][0], None, "Cell at ({x}, 0) should be None");
         }
 
         // The partial line (row 1) should have moved down to replace the cleared line (row 0)
@@ -228,12 +228,11 @@ mod board_tests {
             assert_eq!(
                 board.cells[x][1],
                 Some(TetrominoType::J),
-                "Cell at ({}, 1) should be J",
-                x
+                "Cell at ({x}, 1) should be J"
             );
         }
         for x in 5..board.width {
-            assert_eq!(board.cells[x][1], None, "Cell at ({}, 1) should be None", x);
+            assert_eq!(board.cells[x][1], None, "Cell at ({x}, 1) should be None");
         }
     }
 }
@@ -251,7 +250,7 @@ mod game_state_tests {
         assert_eq!(game_state.score, 0);
         assert_eq!(game_state.level, STARTING_LEVEL);
         assert_eq!(game_state.lines_cleared, 0);
-        assert_eq!(game_state.game_over, false);
+        assert!(!game_state.game_over);
         assert_eq!(game_state.next_tetromino, None);
     }
 
@@ -273,7 +272,7 @@ mod game_state_tests {
         assert_eq!(game_state.score, 0);
         assert_eq!(game_state.level, STARTING_LEVEL);
         assert_eq!(game_state.lines_cleared, 0);
-        assert_eq!(game_state.game_over, false);
+        assert!(!game_state.game_over);
         assert_eq!(game_state.next_tetromino, None);
     }
 

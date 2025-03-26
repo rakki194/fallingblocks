@@ -221,7 +221,7 @@ fn trigger_screen_shake(world: &mut World, intensity: f32, duration: f32) {
     let mut screen_shake = world.resource_mut::<ScreenShake>();
     screen_shake.intensity = intensity;
     screen_shake.duration = duration;
-    trace!("Screen shake triggered with intensity {}", intensity);
+    trace!("Screen shake triggered with intensity {intensity}");
 }
 
 // Helper function to update screen shake

@@ -69,7 +69,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
         70 // Default to 70% when plenty of space
     } else {
         // Calculate minimum percentage needed for the game board
-        let min_game_percent = (board_width as f32 / shake_area.width as f32 * 100.0) as u16;
+        let min_game_percent = (f32::from(board_width) / f32::from(shake_area.width) * 100.0) as u16;
         // Cap between 50% and 80% to ensure info panel is still usable
         min_game_percent.clamp(50, 80)
     };
@@ -98,7 +98,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
         if board_height > available_board_height {
             // Recalculate with height constraint
             let height_constrained_width =
-                (available_board_height as f32 * (BOARD_WIDTH as f32 / BOARD_HEIGHT as f32)) as u16;
+                (f32::from(available_board_height) * (BOARD_WIDTH as f32 / BOARD_HEIGHT as f32)) as u16;
             let new_cell_width = (height_constrained_width / BOARD_WIDTH as u16).max(2);
             let new_cell_height = (new_cell_width / 2).max(1);
 
@@ -208,9 +208,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     };
 
     let combo_text = if combo_count > 1 {
-        format!("Combo: {}", combo_count)
+        format!("Combo: {combo_count}")
     } else {
-        "".to_string()
+        String::new()
     };
 
     let back_to_back_text = if back_to_back { "Back-to-Back" } else { "" };
@@ -221,7 +221,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
             .block(Block::default().borders(Borders::NONE))
             .wrap(Wrap { trim: true })
     } else {
-        Paragraph::new(format!("{}\n{}", combo_text, back_to_back_text))
+        Paragraph::new(format!("{combo_text}\n{back_to_back_text}"))
             .style(Style::default().fg(combo_color))
             .block(Block::default().borders(Borders::NONE))
             .wrap(Wrap { trim: true })
@@ -248,7 +248,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
 }
 
 /// Calculate the responsive board size based on available area
-pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
+#[must_use] pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
     // Calculate the available space
     let available_width = area.width.saturating_sub(4); // Subtract margin
     let available_height = area.height.saturating_sub(4); // Subtract margin
@@ -281,7 +281,7 @@ pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
 }
 
 /// Center a rectangle horizontally within a larger rectangle
-pub fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
+#[must_use] pub fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
     let x = r.x + (r.width.saturating_sub(width)) / 2;
     Rect {
         x,
@@ -408,7 +408,7 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, c
 }
 
 /// Helper function to create a centered rect using up certain percentage of the available rect
-pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+#[must_use] pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

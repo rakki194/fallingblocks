@@ -16,7 +16,7 @@ pub enum TetrominoType {
 }
 
 impl TetrominoType {
-    pub fn random() -> Self {
+    #[must_use] pub fn random() -> Self {
         match fastrand::u8(0..7) {
             0 => TetrominoType::I,
             1 => TetrominoType::J,
@@ -28,7 +28,7 @@ impl TetrominoType {
         }
     }
 
-    pub fn get_blocks(&self) -> Vec<(i32, i32)> {
+    #[must_use] pub fn get_blocks(&self) -> Vec<(i32, i32)> {
         match self {
             TetrominoType::I => vec![(0, 0), (0, 1), (0, 2), (0, 3)],
             TetrominoType::J => vec![(0, 0), (0, 1), (0, 2), (-1, 2)],
@@ -40,7 +40,7 @@ impl TetrominoType {
         }
     }
 
-    pub fn get_color(&self) -> ratatui::style::Color {
+    #[must_use] pub fn get_color(&self) -> ratatui::style::Color {
         match self {
             TetrominoType::I => ratatui::style::Color::Cyan,
             TetrominoType::J => ratatui::style::Color::Blue,
@@ -66,14 +66,14 @@ pub struct Tetromino {
 }
 
 impl Tetromino {
-    pub fn new(tetromino_type: TetrominoType) -> Self {
+    #[must_use] pub fn new(tetromino_type: TetrominoType) -> Self {
         Self {
             tetromino_type,
             rotation: 0,
         }
     }
 
-    pub fn get_blocks(&self) -> Vec<(i32, i32)> {
+    #[must_use] pub fn get_blocks(&self) -> Vec<(i32, i32)> {
         let blocks = self.tetromino_type.get_blocks();
         match self.rotation {
             0 => blocks,
@@ -97,7 +97,7 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(width: usize, height: usize) -> Self {
+    #[must_use] pub fn new(width: usize, height: usize) -> Self {
         Self {
             width,
             height,
@@ -113,7 +113,7 @@ impl Board {
         }
     }
 
-    pub fn is_valid_position(&self, position: &Position, tetromino: &Tetromino) -> bool {
+    #[must_use] pub fn is_valid_position(&self, position: &Position, tetromino: &Tetromino) -> bool {
         let blocks = tetromino.get_blocks();
 
         for (block_x, block_y) in blocks {
@@ -239,7 +239,7 @@ impl GameState {
 
     // Check if board is completely clear (perfect clear)
     #[allow(dead_code)]
-    pub fn is_perfect_clear(&self, board: &Board) -> bool {
+    #[must_use] pub fn is_perfect_clear(&self, board: &Board) -> bool {
         for y in 0..board.height {
             for x in 0..board.width {
                 if board.cells[x][y].is_some() {
@@ -255,7 +255,7 @@ impl GameState {
     // 1. The piece is a T tetromino
     // 2. The piece was just rotated (not moved)
     // 3. At least 3 of the 4 corners around the T center are blocked
-    pub fn is_t_spin(&self, board: &Board, position: &Position, tetromino: &Tetromino) -> bool {
+    #[must_use] pub fn is_t_spin(&self, board: &Board, position: &Position, tetromino: &Tetromino) -> bool {
         // Check if this is a T tetromino
         if tetromino.tetromino_type != TetrominoType::T {
             return false;
@@ -275,7 +275,7 @@ impl GameState {
 
         // Count how many corners are blocked (either by a block or the boundary)
         let mut blocked_corners = 0;
-        for (x, y) in corners.iter() {
+        for (x, y) in &corners {
             // Check if corner is outside the board
             if *x < 0 || *x >= board.width as i32 || *y < 0 || *y >= board.height as i32 {
                 blocked_corners += 1;
@@ -392,7 +392,7 @@ impl GameState {
 
         // Level progression based on score thresholds
         let mut score_level = crate::game::STARTING_LEVEL;
-        for &(threshold, level) in crate::game::LEVEL_SCORE_THRESHOLDS.iter() {
+        for &(threshold, level) in crate::game::LEVEL_SCORE_THRESHOLDS {
             if self.score >= threshold {
                 score_level = level;
             } else {
@@ -407,7 +407,7 @@ impl GameState {
         );
     }
 
-    pub fn get_drop_delay(&self) -> f32 {
+    #[must_use] pub fn get_drop_delay(&self) -> f32 {
         // Speed increases with level (faster drops as level increases)
         // More aggressive curve with higher levels
         if self.level < 10 {

@@ -55,7 +55,7 @@ fn main() -> AppResult<()> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        error!("Game error: {:?}", err);
+        error!("Game error: {err:?}");
     }
 
     Ok(())
@@ -98,16 +98,13 @@ fn run_app<B: Backend>(
         // Process keyboard input
         if crossterm::event::poll(Duration::from_millis(5))? {
             if let Event::Key(key) = event::read()? {
-                debug!("Key event: {:?}", key);
+                debug!("Key event: {key:?}");
 
                 // Check for key release events
                 if key.kind == event::KeyEventKind::Release {
                     // Track key releases for key-repeat prevention
                     let mut input = app.world.resource_mut::<Input>();
-                    match key.code {
-                        KeyCode::Enter => input.hard_drop_released = true,
-                        _ => {}
-                    }
+                    if key.code == KeyCode::Enter { input.hard_drop_released = true }
                     continue; // Skip the rest of the input processing for release events
                 }
 
@@ -156,8 +153,8 @@ fn run_app<B: Backend>(
                             input.left = false;
                         }
                         KeyCode::Down | KeyCode::Char('s') => input.down = true,
-                        KeyCode::Up | KeyCode::Char('w') | KeyCode::Char(' ') => {
-                            input.rotate = true
+                        KeyCode::Up | KeyCode::Char('w' | ' ') => {
+                            input.rotate = true;
                         }
                         KeyCode::Enter => {
                             // Only set hard_drop to true if the key was previously released

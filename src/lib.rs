@@ -20,7 +20,7 @@ pub struct Time {
 }
 
 impl Time {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             delta: Duration::default(),
             last_update: Instant::now(),
@@ -33,7 +33,7 @@ impl Time {
         self.last_update = now;
     }
 
-    pub fn delta_seconds(&self) -> f32 {
+    #[must_use] pub fn delta_seconds(&self) -> f32 {
         self.delta.as_secs_f32()
     }
 }
