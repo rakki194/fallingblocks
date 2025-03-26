@@ -383,10 +383,11 @@ impl GameState {
     // Update level based on both lines cleared and score thresholds
     pub fn update_level(&mut self) {
         // Traditional level progression based on lines cleared
-        let lines_level = (self.lines_cleared / crate::game::LINES_PER_LEVEL) + 1;
+        let lines_level =
+            (self.lines_cleared / crate::game::LINES_PER_LEVEL) + crate::game::STARTING_LEVEL;
 
         // Level progression based on score thresholds
-        let mut score_level = 1;
+        let mut score_level = crate::game::STARTING_LEVEL;
         for &(threshold, level) in crate::game::LEVEL_SCORE_THRESHOLDS.iter() {
             if self.score >= threshold {
                 score_level = level;

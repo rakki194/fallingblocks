@@ -3,7 +3,6 @@ mod tests {
     use crate::app::App;
     use crate::components::{Board, GameState, Position, Tetromino, TetrominoType};
     use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
-    use bevy_ecs::prelude::*;
 
     #[test]
     fn test_app_creation() {

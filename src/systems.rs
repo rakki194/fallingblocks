@@ -64,6 +64,17 @@ pub fn input_system(world: &mut World) {
     let input = world.resource::<Input>().clone();
     let screen_shake = world.resource::<ScreenShake>().clone();
 
+    // Check if game is paused for resize
+    let is_paused = {
+        let game_state = world.resource::<GameState>();
+        game_state.was_paused_for_resize
+    };
+
+    // Skip input processing if game is paused for resize
+    if is_paused {
+        return;
+    }
+
     // Check if screen shake is active
     if screen_shake.is_active {
         // If screen shake is active, ignore inputs
