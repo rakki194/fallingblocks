@@ -1,0 +1,27 @@
+[package]
+name = "fallingblocks"
+version = "0.1.0"
+edition = "2024"
+authors = ["rakki194"]
+description = "A Tetris game implemented with ratatui and bevy_ecs"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rakki194/fallingblocks"
+documentation = "https://docs.rs/fallingblocks"
+homepage = "https://github.com/rakki194/fallingblocks"
+keywords = ["game", "tetris", "terminal", "tui", "bevy"]
+categories = ["games", "command-line-utilities"]
+readme = "README.md"
+
+[dependencies]
+ratatui = "0.29.0"
+bevy_ecs = "0.15.3"
+fastrand = "2.3.0"
+crossterm = "0.28.1"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+log = "0.4.27"
+env_logger = "0.11.7"
+# Audio dependencies
+fundsp = "0.20.0"
+cpal = "0.15.3"
+anyhow = "1.0.97"
