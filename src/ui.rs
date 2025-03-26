@@ -7,17 +7,19 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, app: &mut App) {
-    // Define minimum sizes required for the game to be playable
-    let cell_width = 2; // Each cell is 2 characters wide
-    let cell_height = 1; // Each cell is 1 character tall
-    let board_width = BOARD_WIDTH as u16 * cell_width + 2; // +2 for borders
-    let board_height = BOARD_HEIGHT as u16 * cell_height + 2; // +2 for borders
+    // Get available area
+    let available_area = f.area();
+
+    // Calculate ideal game board dimensions based on available space
+    let (board_width, board_height, cell_width, cell_height) =
+        calculate_responsive_board_size(available_area);
+
+    // Minimum info panel width
     let min_info_width = 20u16;
-    let min_total_width = board_width + min_info_width;
-    let min_total_height = board_height + 5; // Adding space for title and borders
 
     // Check if the terminal is too small to render the game properly
-    if f.area().width < min_total_width || f.area().height < min_total_height {
+    if available_area.width < (board_width + min_info_width) || available_area.height < board_height
+    {
         // Pause the game by updating the game state
         let mut game_state = app.world.resource_mut::<GameState>();
         if !game_state.game_over {
@@ -36,7 +38,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
         );
 
         // Center the warning message in the available space
-        let warning_area = centered_rect(50, 30, f.area());
+        let warning_area = centered_rect(50, 30, available_area);
         f.render_widget(warning_text, warning_area);
         return;
     } else if app.world.resource::<GameState>().was_paused_for_resize {
@@ -59,44 +61,74 @@ pub fn render(f: &mut Frame, app: &mut App) {
         height: original_area.height,
     };
 
-    // Calculate required board space
-    let cell_width = 2; // Each cell is 2 characters wide
-    let cell_height = 1; // Each cell is 1 character tall
-    let board_width = BOARD_WIDTH as u16 * cell_width + 2; // +2 for borders
-    let board_height = BOARD_HEIGHT as u16 * cell_height + 2; // +2 for borders
-
-    // Define minimum required width for the info panel
-    let min_info_width = 20u16;
-
-    // Calculate total minimum width needed
-    let min_total_width = board_width + min_info_width;
-
-    // Define layout with minimum width consideration
-    let available_width = shake_area.width;
-    let board_percentage = if available_width > min_total_width {
-        (board_width as f64 / available_width as f64 * 100.0) as u16
+    // Calculate the best layout split between game area and info panel
+    // Allocate approximately 70% to the game and 30% to the info when space allows
+    let game_percentage = if shake_area.width > (board_width + 2 * min_info_width) {
+        70 // Default to 70% when plenty of space
     } else {
-        70 // Default if screen is too small
+        // Calculate minimum percentage needed for the game board
+        let min_game_percent = (board_width as f32 / shake_area.width as f32 * 100.0) as u16;
+        // Cap between 50% and 80% to ensure info panel is still usable
+        min_game_percent.min(80).max(50)
     };
 
+    // Create the horizontal layout
     let main_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(board_percentage),
-            Constraint::Percentage(100 - board_percentage),
+            Constraint::Percentage(game_percentage),
+            Constraint::Percentage(100 - game_percentage),
         ])
         .split(shake_area);
 
+    // Game area (left panel)
+    let game_area = main_layout[0];
+
+    // Calculate the vertical space needed for the board within the game area
+    let title_height = 2u16; // Height of the title area
+    let bottom_margin = 1u16; // Height of the bottom margin
+    let available_board_height = game_area
+        .height
+        .saturating_sub(title_height + bottom_margin);
+
+    // If board_height is greater than available_board_height, we need to recalculate
+    let (final_board_width, final_board_height, final_cell_width, final_cell_height) =
+        if board_height > available_board_height {
+            // Recalculate with height constraint
+            let height_constrained_width =
+                (available_board_height as f32 * (BOARD_WIDTH as f32 / BOARD_HEIGHT as f32)) as u16;
+            let new_cell_width = (height_constrained_width / BOARD_WIDTH as u16).max(2);
+            let new_cell_height = (new_cell_width / 2).max(1);
+
+            (
+                BOARD_WIDTH as u16 * new_cell_width + 2,
+                BOARD_HEIGHT as u16 * new_cell_height + 2,
+                new_cell_width,
+                new_cell_height,
+            )
+        } else {
+            (board_width, board_height, cell_width, cell_height)
+        };
+
+    // Create game layout with vertical constraints
     let game_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),            // Title
-            Constraint::Fill(1),              // Flexible spacing above game board
-            Constraint::Length(board_height), // Game board (fixed height)
-            Constraint::Length(1),            // Bottom border
+            Constraint::Length(title_height),    // Title
+            Constraint::Min(final_board_height), // Space for board (at least as tall as the board)
+            Constraint::Length(bottom_margin),   // Bottom margin
         ])
-        .split(main_layout[0]);
+        .split(game_area);
 
+    // Board area - center horizontally within available space
+    let board_area = Rect {
+        x: game_layout[1].x + (game_layout[1].width.saturating_sub(final_board_width)) / 2,
+        y: game_layout[1].y + (game_layout[1].height.saturating_sub(final_board_height)) / 2,
+        width: final_board_width,
+        height: final_board_height,
+    };
+
+    // Define the info panel layout
     let info_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -113,8 +145,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::BOTTOM));
     f.render_widget(title, game_layout[0]);
 
-    // Render game board - now using index 2 since we added a fill constraint
-    render_game_board(f, app, game_layout[2]);
+    // Render game board with the calculated dimensions
+    render_game_board(f, app, board_area, final_cell_width, final_cell_height);
 
     // Render score and info
     let info_title = Paragraph::new("INFO")
@@ -209,11 +241,51 @@ pub fn render(f: &mut Frame, app: &mut App) {
     f.render_widget(controls, info_layout[2]);
 }
 
-fn render_game_board(f: &mut Frame, app: &mut App, area: Rect) {
-    // Calculate fixed cell size
-    let cell_width = 2; // Each cell is 2 characters wide
-    let _cell_height = 1; // Each cell is 1 character tall
+/// Calculate the responsive board size based on available area
+fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
+    // Calculate available area (accounting for some minimal borders/margins)
+    let available_width = area.width.saturating_sub(4); // Minimal horizontal margin
+    let available_height = area.height.saturating_sub(4); // Minimal vertical margin
 
+    // Calculate the aspect ratio of the original game board
+    let board_aspect_ratio = BOARD_WIDTH as f32 / BOARD_HEIGHT as f32;
+
+    // Base cell size calculations
+    // Determine maximum possible cell dimensions while maintaining proper aspect ratio
+    let max_cell_width_by_width = available_width / BOARD_WIDTH as u16;
+    let max_cell_height_by_height = available_height / BOARD_HEIGHT as u16;
+
+    // Enforce 2:1 width-to-height ratio for visual "square" appearance in terminal
+    // Terminal characters are typically about twice as tall as they are wide
+    let max_cell_width_by_height = max_cell_height_by_height * 2;
+
+    // Choose the smaller dimension to ensure board fits
+    let cell_width = max_cell_width_by_width.min(max_cell_width_by_height);
+    // Ensure cell width is at least 2 and even (for better appearance)
+    let cell_width = (cell_width.max(2) / 2) * 2;
+
+    // Calculate cell height based on the 2:1 ratio (half the width, minimum 1)
+    let cell_height = (cell_width / 2).max(1);
+
+    // Calculate final board dimensions including borders
+    let board_width = BOARD_WIDTH as u16 * cell_width + 2; // +2 for borders
+    let board_height = BOARD_HEIGHT as u16 * cell_height + 2; // +2 for borders
+
+    (board_width, board_height, cell_width, cell_height)
+}
+
+/// Center a rectangle horizontally within a larger rectangle
+fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
+    let x = r.x + (r.width.saturating_sub(width)) / 2;
+    Rect {
+        x,
+        y: r.y,
+        width: width.min(r.width), // Ensure it doesn't exceed available width
+        height: r.height,
+    }
+}
+
+fn render_game_board(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, cell_height: u16) {
     // Calculate the inner area (inside the borders)
     let inner_area = Block::default().borders(Borders::ALL).inner(area);
 
@@ -228,36 +300,39 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect) {
         let x = position.x as u16;
         let y = position.y as u16;
 
-        // Each cell is 2x1 characters to make it more square-like
+        // Each cell is sized according to calculated dimensions
         if x < BOARD_WIDTH as u16 && y < BOARD_HEIGHT as u16 {
             let block_x = inner_area.left() + x * cell_width;
 
             // Fix: Invert Y coordinate to start from the bottom instead of the top
-            // This ensures blocks appear at the bottom of the board with no extra space
-            let block_y = inner_area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y);
+            let block_y = inner_area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y) * cell_height;
 
             if block_x < inner_area.right() && block_y < inner_area.bottom() {
                 let color = tetromino_type.get_color();
 
-                // Use the current Ratatui API for setting cells
-                if let Some(cell) = f.buffer_mut().cell_mut((block_x, block_y)) {
-                    cell.set_symbol("█");
-                    cell.set_fg(color);
-                    cell.set_bg(Color::Black);
-                }
+                // Draw a single block with proper proportional size
+                // For cell_width=2 and cell_height=1, this matches the original rendering
+                let block_char = if cell_width >= 2 && cell_height >= 1 {
+                    "█"
+                } else {
+                    "■"
+                };
 
-                // Make the block two cells wide for better proportions
-                if let Some(cell) = f.buffer_mut().cell_mut((block_x + 1, block_y)) {
-                    cell.set_symbol("█");
-                    cell.set_fg(color);
-                    cell.set_bg(Color::Black);
+                for dx in 0..cell_width {
+                    for dy in 0..cell_height {
+                        if let Some(cell) = f.buffer_mut().cell_mut((block_x + dx, block_y - dy)) {
+                            cell.set_symbol(block_char);
+                            cell.set_fg(color);
+                            cell.set_bg(Color::Black);
+                        }
+                    }
                 }
             }
         }
     }
 
     // Render particles
-    render_particles(f, app, inner_area);
+    render_particles(f, app, inner_area, cell_width, cell_height);
 
     // If game is over, overlay "GAME OVER" text
     let game_state = app.world.resource::<GameState>();
@@ -267,9 +342,9 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect) {
             .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
         let game_over_area = Rect {
-            x: inner_area.x + (inner_area.width / 2) - 5,
+            x: inner_area.x,
             y: inner_area.y + (inner_area.height / 2),
-            width: 10,
+            width: inner_area.width,
             height: 1,
         };
 
@@ -278,7 +353,7 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 // Render all particles
-fn render_particles(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, cell_height: u16) {
     // Collect all particles
     let particles_data = app
         .world
@@ -292,13 +367,12 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect) {
 
         // Check if particle is inside the board area
         if x < BOARD_WIDTH as u16 && y < BOARD_HEIGHT as u16 {
-            let particle_x = area.left() + x * 2;
+            let particle_x = area.left() + x * cell_width;
 
             // Use the same Y-coordinate calculation as the game board
-            let particle_y = area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y);
+            let particle_y = area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y) * cell_height;
 
             if particle_x < area.right() && particle_y < area.bottom() {
-                let _opacity = (particle.lifetime * 255.0) as u8;
                 let color = particle.color;
 
                 // Different particle size based on the size attribute
@@ -310,10 +384,17 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect) {
                     "▒" // Low density for small particles
                 };
 
-                // Draw particle
-                if let Some(cell) = f.buffer_mut().cell_mut((particle_x, particle_y)) {
-                    cell.set_symbol(particle_size);
-                    cell.set_fg(color);
+                // Draw particle (applying the same cell size as game blocks)
+                for dx in 0..cell_width {
+                    for dy in 0..cell_height.min(1) {
+                        // Limit particle height to 1 for better aesthetics
+                        if let Some(cell) =
+                            f.buffer_mut().cell_mut((particle_x + dx, particle_y - dy))
+                        {
+                            cell.set_symbol(particle_size);
+                            cell.set_fg(color);
+                        }
+                    }
                 }
             }
         }

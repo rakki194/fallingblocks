@@ -16,9 +16,9 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use fallingblocks::Time;
 use log::{debug, error, info};
 use ratatui::{Terminal, prelude::*};
-use fallingblocks::Time;
 
 fn main() -> AppResult<()> {
     // Initialize logger

@@ -1,6 +1,6 @@
 [package]
 name = "fallingblocks"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["rakki194"]
 description = "A Tetris game implemented with ratatui and bevy_ecs"

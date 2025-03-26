@@ -3,7 +3,7 @@ pub const BOARD_WIDTH: usize = 10;
 pub const BOARD_HEIGHT: usize = 20;
 
 // Game timing
-pub const COYOTE_TIME_DURATION: f32 = 0.25; // Time in seconds for coyote time (last chance to move/rotate)
+pub const COYOTE_TIME_DURATION: f32 = 0.05; // Time in seconds for coyote time (last chance to move/rotate)
 
 // Basic line clear scoring (level 1 values, will be multiplied by level)
 pub const POINTS_SINGLE: u32 = 40;
