@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use bevy_ecs::prelude::*;
 use log::{debug, trace};
 use ratatui::style::Color;
@@ -34,7 +36,7 @@ pub fn spawn_lock_particles(world: &mut World, position: &Position, tetromino: &
 
             spawn_particle(
                 world,
-                block_pos.clone(),
+                block_pos,
                 (vx, vy),
                 color,
                 fastrand::f32() * 0.8 + 0.2, // lifetime: 0.2 to 1.0 seconds
@@ -71,7 +73,7 @@ pub fn spawn_rotation_particles(world: &mut World, position: &Position, tetromin
 
             spawn_particle(
                 world,
-                block_pos.clone(),
+                block_pos,
                 (vx, vy),
                 color,
                 fastrand::f32() * 0.4 + 0.1, // lifetime: 0.1 to 0.5 seconds
@@ -117,7 +119,7 @@ pub fn spawn_coyote_time_particles(world: &mut World, position: &Position, tetro
 
             spawn_particle(
                 world,
-                block_pos.clone(),
+                block_pos,
                 (vx, vy),
                 Color::White,
                 fastrand::f32() * 0.5 + 0.2, // lifetime: 0.2 to 0.7 seconds
@@ -145,7 +147,7 @@ pub fn spawn_perfect_clear_particles(world: &mut World, board_width: usize, boar
 
             spawn_particle(
                 world,
-                particle_pos.clone(),
+                particle_pos,
                 (vx, vy),
                 Color::Yellow,
                 fastrand::f32() * 1.2 + 0.5, // lifetime: 0.5 to 1.7 seconds

@@ -1,5 +1,7 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use crate::app::App;
-use crate::components::{GameState, Particle, ScreenShake, TetrominoType};
+use crate::components::{GameState, Particle, ScreenShake};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use ratatui::{
     prelude::*,
@@ -69,7 +71,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
         // Calculate minimum percentage needed for the game board
         let min_game_percent = (board_width as f32 / shake_area.width as f32 * 100.0) as u16;
         // Cap between 50% and 80% to ensure info panel is still usable
-        min_game_percent.min(80).max(50)
+        min_game_percent.clamp(50, 80)
     };
 
     // Create the horizontal layout
@@ -247,12 +249,12 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
 /// Calculate the responsive board size based on available area
 pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
-    // Calculate available area (accounting for some minimal borders/margins)
-    let available_width = area.width.saturating_sub(4); // Minimal horizontal margin
-    let available_height = area.height.saturating_sub(4); // Minimal vertical margin
+    // Calculate the available space
+    let available_width = area.width.saturating_sub(4); // Subtract margin
+    let available_height = area.height.saturating_sub(4); // Subtract margin
 
     // Calculate the aspect ratio of the original game board
-    let board_aspect_ratio = BOARD_WIDTH as f32 / BOARD_HEIGHT as f32;
+    let _board_aspect_ratio = BOARD_WIDTH as f32 / BOARD_HEIGHT as f32;
 
     // Base cell size calculations
     // Determine maximum possible cell dimensions while maintaining proper aspect ratio

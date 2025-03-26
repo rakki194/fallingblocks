@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 #[cfg(test)]
 mod position_tests {
     use crate::components::Position;

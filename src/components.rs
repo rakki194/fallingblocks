@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use bevy_ecs::prelude::*;
 use crossterm::event::KeyEvent;
 use std::time::Instant;

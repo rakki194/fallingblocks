@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 #[cfg(test)]
 mod tests {
     use crate::app::App;

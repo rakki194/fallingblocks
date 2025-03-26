@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 // Test modules
 pub mod app_tests;
 pub mod components_tests;

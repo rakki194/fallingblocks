@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use bevy_ecs::prelude::*;
 use std::error;
 
@@ -35,8 +37,10 @@ impl App {
         world.insert_resource(crate::Time::new());
 
         // Initialize game state
-        let mut game_state = GameState::default();
-        game_state.next_tetromino = Some(TetrominoType::random());
+        let game_state = GameState {
+            next_tetromino: Some(TetrominoType::random()),
+            ..Default::default()
+        };
         world.insert_resource(game_state);
 
         // Initialize screen shake
@@ -112,5 +116,11 @@ impl App {
 
         blocks.extend(tetromino_blocks);
         blocks
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
     }
 }

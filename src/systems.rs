@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use bevy_ecs::prelude::*;
 use log::{debug, info, trace};
 
@@ -55,9 +57,7 @@ pub fn spawn_tetromino(world: &mut World) {
     }
 
     // Create the ghost piece at the same initial position
-    let ghost = Ghost {
-        position: position.clone(),
-    };
+    let ghost = Ghost { position };
 
     // Spawn the tetromino entity with a ghost
     world.spawn((tetromino, position, ghost));
@@ -125,11 +125,10 @@ pub fn input_system(world: &mut World) {
 
     {
         let mut query = world.query::<(Entity, &Tetromino, &Position, &Ghost)>();
-        for (entity, tetromino, position, _) in query.iter(world) {
+        if let Some((entity, tetromino, position, _)) = query.iter(world).next() {
             entity_id = Some(entity);
-            tetromino_clone = Some(tetromino.clone());
-            position_clone = Some(position.clone());
-            break; // Only process the first tetromino
+            tetromino_clone = Some(*tetromino);
+            position_clone = Some(*position);
         }
     }
 
@@ -165,7 +164,7 @@ pub fn input_system(world: &mut World) {
             };
 
             // Update position
-            world.entity_mut(entity).insert(new_position.clone());
+            world.entity_mut(entity).insert(new_position);
 
             // Update ghost position
             if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
@@ -199,7 +198,7 @@ pub fn input_system(world: &mut World) {
 
         if can_move_down {
             // Update position
-            world.entity_mut(entity).insert(new_position.clone());
+            world.entity_mut(entity).insert(new_position);
 
             // Track soft drop distance for scoring
             let mut game_state = world.resource_mut::<GameState>();
@@ -240,7 +239,7 @@ pub fn input_system(world: &mut World) {
 
     // Handle rotation
     if input.rotate {
-        let mut new_tetromino = tetromino.clone();
+        let mut new_tetromino = tetromino;
         new_tetromino.rotate();
 
         // Check if the rotation is valid
@@ -261,7 +260,7 @@ pub fn input_system(world: &mut World) {
             };
 
             // Update tetromino
-            world.entity_mut(entity).insert(new_tetromino.clone());
+            world.entity_mut(entity).insert(new_tetromino);
 
             // Add rotation effect
             if fastrand::f32() < 0.3 {
@@ -287,11 +286,10 @@ fn handle_hard_drop(world: &mut World) {
 
     {
         let mut query = world.query::<(Entity, &Tetromino, &Position, &Ghost)>();
-        for (entity, tetromino, position, _) in query.iter(world) {
+        if let Some((entity, tetromino, position, _)) = query.iter(world).next() {
             entity_id = Some(entity);
-            tetromino_clone = Some(tetromino.clone());
-            position_clone = Some(position.clone());
-            break; // Only process the first tetromino
+            tetromino_clone = Some(*tetromino);
+            position_clone = Some(*position);
         }
     }
 
@@ -420,11 +418,10 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
         // Collect the active tetromino data
         {
             let mut entities = world.query::<(Entity, &Tetromino, &Position)>();
-            for (entity, tetromino, position) in entities.iter(world) {
+            if let Some((entity, tetromino, position)) = entities.iter(world).next() {
                 tetromino_entity = Some(entity);
                 tetromino_data = Some(*tetromino);
                 position_data = Some(*position);
-                break;
             }
         }
 
@@ -499,11 +496,10 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
             let count = entities.iter(world).count();
             debug!("Found {} tetromino entities", count);
 
-            for (entity, tetromino, position) in entities.iter(world) {
+            if let Some((entity, tetromino, position)) = entities.iter(world).next() {
                 tetromino_entity = Some(entity);
                 tetromino_data = Some(*tetromino);
                 position_data = Some(*position);
-                break;
             }
         }
 
@@ -566,7 +562,7 @@ fn handle_piece_lock(
     let is_t_spin = {
         let board = world.resource::<Board>();
         let game_state = world.resource::<GameState>();
-        game_state.is_t_spin(&board, position, tetromino)
+        game_state.is_t_spin(board, position, tetromino)
     };
 
     // First lock the tetromino
@@ -588,10 +584,9 @@ fn handle_piece_lock(
         // Check for perfect clear
         let is_perfect_clear = if lines_cleared > 0 {
             let cells = board.cells.clone();
-            let is_empty = cells
+            cells
                 .iter()
-                .all(|row| row.iter().all(|cell| cell.is_none()));
-            is_empty
+                .all(|row| row.iter().all(|cell| cell.is_none()))
         } else {
             false
         };

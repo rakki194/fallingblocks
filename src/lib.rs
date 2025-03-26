@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 pub mod app;
 pub mod components;
 pub mod game;
@@ -33,5 +35,11 @@ impl Time {
 
     pub fn delta_seconds(&self) -> f32 {
         self.delta.as_secs_f32()
+    }
+}
+
+impl Default for Time {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 // Game board dimensions
 pub const BOARD_WIDTH: usize = 10;
 pub const BOARD_HEIGHT: usize = 20;
