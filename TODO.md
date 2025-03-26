@@ -24,7 +24,7 @@
 - [x] Tests for game mechanics
 - [x] Tests for UI rendering
 - [x] Integration tests
-- [ ] Preview of next tetromino
+- [x] Preview of next tetromino
 - [ ] Hold piece functionality
 - [ ] Ghost piece showing where tetromino will land
 - [ ] Additional visual polish

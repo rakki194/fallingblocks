@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::app::App;
-    use crate::components::GameState;
-    use crate::ui::{self, calculate_responsive_board_size, centered_rect};
+    use crate::components::{GameState, TetrominoType};
+    use crate::ui::{self, calculate_responsive_board_size, centered_rect, render_next_tetromino};
     use ratatui::{backend::TestBackend, layout::Rect, prelude::*};
 
     // Helper function to create a test terminal
@@ -96,5 +96,51 @@ mod tests {
 
         // This should render the game over text without crashing
         terminal.draw(|f| ui::render(f, &mut app)).unwrap();
+    }
+
+    #[test]
+    fn test_next_tetromino_rendering() {
+        // Create a test app
+        let mut app = App::new();
+
+        // Set a known next tetromino
+        {
+            let mut game_state = app.world.resource_mut::<GameState>();
+            game_state.next_tetromino = Some(TetrominoType::I);
+        }
+
+        // Create a test terminal
+        let mut terminal = create_test_terminal(40, 20);
+
+        // Create a test area for the next tetromino preview
+        let preview_area = Rect::new(5, 5, 10, 10);
+
+        // Test that rendering doesn't panic
+        terminal
+            .draw(|f| {
+                render_next_tetromino(f, &mut app, preview_area);
+            })
+            .unwrap();
+
+        // Verify that something was rendered (buffer is not empty)
+        let buffer = terminal.backend().buffer();
+        let mut has_content = false;
+
+        for x in preview_area.left()..preview_area.right() {
+            for y in preview_area.top()..preview_area.bottom() {
+                if let Some(cell) = buffer.cell((x, y)) {
+                    // Check if the cell has content (foreground color changed from default)
+                    if cell.fg != Color::Reset && cell.fg != Color::White {
+                        has_content = true;
+                        break;
+                    }
+                }
+            }
+            if has_content {
+                break;
+            }
+        }
+
+        assert!(has_content, "Next tetromino preview should render content");
     }
 }

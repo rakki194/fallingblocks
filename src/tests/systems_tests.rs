@@ -120,4 +120,51 @@ mod tests {
         // The rotation should have changed
         assert_ne!(new_rotation, initial_rotation);
     }
+
+    #[test]
+    fn test_next_tetromino_preview() {
+        let mut world = setup_test_world();
+
+        // Initialize the next tetromino in GameState
+        {
+            let mut game_state = world.resource_mut::<GameState>();
+            game_state.next_tetromino = Some(TetrominoType::T);
+        }
+
+        // Spawn a tetromino, which should use the next_tetromino we just set
+        spawn_tetromino(&mut world);
+
+        // Check if the active tetromino is of type T
+        let active_tetromino_type = world
+            .query::<&Tetromino>()
+            .iter(&world)
+            .next()
+            .unwrap()
+            .tetromino_type;
+
+        assert_eq!(active_tetromino_type, TetrominoType::T);
+
+        // Verify that a new next_tetromino was generated
+        {
+            let game_state = world.resource::<GameState>();
+            assert!(game_state.next_tetromino.is_some());
+        }
+
+        // Get the entity ID of the first tetromino
+        let entity = world
+            .query_filtered::<Entity, With<Tetromino>>()
+            .iter(&world)
+            .next()
+            .unwrap();
+
+        // Despawn the first tetromino before spawning the second one
+        world.despawn(entity);
+
+        // Spawn another tetromino
+        spawn_tetromino(&mut world);
+
+        // Now only one tetromino should exist
+        let tetromino_count = world.query::<&Tetromino>().iter(&world).count();
+        assert_eq!(tetromino_count, 1);
+    }
 }

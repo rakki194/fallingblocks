@@ -238,7 +238,7 @@ mod board_tests {
 
 #[cfg(test)]
 mod game_state_tests {
-    use crate::components::GameState;
+    use crate::components::{GameState, TetrominoType};
     use crate::game::{LINES_PER_LEVEL, STARTING_LEVEL};
 
     #[test]
@@ -250,6 +250,7 @@ mod game_state_tests {
         assert_eq!(game_state.level, STARTING_LEVEL);
         assert_eq!(game_state.lines_cleared, 0);
         assert_eq!(game_state.game_over, false);
+        assert_eq!(game_state.next_tetromino, None);
     }
 
     #[test]
@@ -261,6 +262,7 @@ mod game_state_tests {
         game_state.level = 5;
         game_state.lines_cleared = 40;
         game_state.game_over = true;
+        game_state.next_tetromino = Some(TetrominoType::I);
 
         // Reset
         game_state.reset();
@@ -270,6 +272,7 @@ mod game_state_tests {
         assert_eq!(game_state.level, STARTING_LEVEL);
         assert_eq!(game_state.lines_cleared, 0);
         assert_eq!(game_state.game_over, false);
+        assert_eq!(game_state.next_tetromino, None);
     }
 
     #[test]
@@ -284,5 +287,26 @@ mod game_state_tests {
 
         // Check level increased - update to expected level
         assert_eq!(game_state.level, STARTING_LEVEL);
+    }
+
+    #[test]
+    fn test_game_state_next_tetromino() {
+        let mut game_state = GameState::default();
+
+        // Initially next_tetromino should be None
+        assert_eq!(game_state.next_tetromino, None);
+
+        // Set a specific tetromino type
+        game_state.next_tetromino = Some(TetrominoType::Z);
+
+        // Verify it was set correctly
+        assert_eq!(game_state.next_tetromino, Some(TetrominoType::Z));
+
+        // Take the next tetromino (simulating spawn_tetromino behavior)
+        let next = game_state.next_tetromino.take();
+
+        // Verify we get the expected type and it's now None in the game state
+        assert_eq!(next, Some(TetrominoType::Z));
+        assert_eq!(game_state.next_tetromino, None);
     }
 }

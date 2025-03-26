@@ -427,7 +427,7 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 // Function to render the next tetromino preview
-fn render_next_tetromino(f: &mut Frame, app: &mut App, area: Rect) {
+pub fn render_next_tetromino(f: &mut Frame, app: &mut App, area: Rect) {
     // Create a preview box with a title
     let next_block = Block::default().title("NEXT").borders(Borders::ALL);
 
@@ -455,28 +455,57 @@ fn render_next_tetromino(f: &mut Frame, app: &mut App, area: Rect) {
                 max_y = max_y.max(y);
             }
 
+            // Calculate cell dimensions to match board aspect ratio
             let width = (max_x - min_x + 1) as u16;
             let height = (max_y - min_y + 1) as u16;
 
-            // Center the tetromino in the preview area
-            let center_x = inner_area.left() + inner_area.width / 2;
-            let center_y = inner_area.top() + inner_area.height / 2;
+            // Calculate available space in the preview area
+            let available_width = inner_area.width;
+            let available_height = inner_area.height;
 
-            let start_x = center_x - width / 2;
-            let start_y = center_y - height / 2;
+            // Calculate block size that fits within the preview area
+            // Accounting for terminal character aspect ratio (2:1 width-to-height)
+            let max_block_width = available_width / width;
+            let max_block_height = available_height / height;
+
+            // Ensure proper aspect ratio (terminal characters are typically twice as tall as they are wide)
+            let block_width = max_block_width.min(max_block_height * 2);
+            // Make sure width is even for better appearance
+            let block_width = (block_width / 2) * 2;
+            let block_height = (block_width / 2).max(1);
+
+            // Center the tetromino in the preview area
+            let total_width = width * block_width;
+            let total_height = height * block_height;
+
+            let start_x = inner_area.left() + (available_width - total_width) / 2;
+            let start_y = inner_area.top() + (available_height - total_height) / 2;
 
             let color = next_type.get_color();
 
             // Draw the tetromino blocks
             for &(x, y) in &blocks {
-                let adjusted_x = start_x + (x - min_x) as u16;
-                let adjusted_y = start_y + (y - min_y) as u16;
+                let block_x = start_x + (x - min_x) as u16 * block_width;
+                let block_y = start_y + (y - min_y) as u16 * block_height;
 
-                if adjusted_x < inner_area.right() && adjusted_y < inner_area.bottom() {
-                    if let Some(cell) = f.buffer_mut().cell_mut((adjusted_x, adjusted_y)) {
-                        cell.set_symbol("█");
-                        cell.set_fg(color);
-                        cell.set_bg(Color::Black);
+                if block_x < inner_area.right() && block_y < inner_area.bottom() {
+                    // Draw a single block with proper proportional size
+                    let block_char = if block_width >= 2 && block_height >= 1 {
+                        "█"
+                    } else {
+                        "■"
+                    };
+
+                    for dx in 0..block_width {
+                        for dy in 0..block_height {
+                            if let Some(cell) =
+                                f.buffer_mut().cell_mut((block_x + dx, block_y + dy))
+                            {
+                                cell.set_symbol(block_char);
+                                cell.set_fg(color);
+                                cell.set_bg(Color::Black);
+                            }
+                        }
                     }
                 }
             }
