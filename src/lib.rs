@@ -5,6 +5,9 @@ pub mod particles;
 pub mod systems;
 pub mod ui;
 
+#[cfg(test)]
+pub mod tests;
+
 use bevy_ecs::prelude::Resource;
 use std::time::{Duration, Instant};
 

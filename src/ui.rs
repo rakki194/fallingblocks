@@ -242,7 +242,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
 }
 
 /// Calculate the responsive board size based on available area
-fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
+pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
     // Calculate available area (accounting for some minimal borders/margins)
     let available_width = area.width.saturating_sub(4); // Minimal horizontal margin
     let available_height = area.height.saturating_sub(4); // Minimal vertical margin
@@ -275,7 +275,7 @@ fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
 }
 
 /// Center a rectangle horizontally within a larger rectangle
-fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
+pub fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
     let x = r.x + (r.width.saturating_sub(width)) / 2;
     Rect {
         x,
@@ -402,7 +402,7 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, c
 }
 
 /// Helper function to create a centered rect using up certain percentage of the available rect
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
