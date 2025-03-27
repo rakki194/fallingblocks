@@ -1,6 +1,6 @@
-# Rust Tetris Game with ratatui and bevy_ecs
+# fallingblocks
 
-A terminal-based Tetris game implemented in Rust using ratatui for the terminal UI and bevy_ecs for game logic.
+A terminal-based Tetris game implemented in Rust using `ratatui` for the terminal UI and `bevy_ecs` for game logic.
 
 ## Features
 

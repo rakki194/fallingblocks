@@ -1,4 +1,16 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    // Allow truncation when casting from usize to i32 since board dimensions are always small enough to fit in i32
+    clippy::cast_possible_truncation,
+    // Allow sign loss when going from signed to unsigned types since we validate values are non-negative before casting
+    clippy::cast_sign_loss,
+    // Allow precision loss when casting between numeric types since exact precision isn't critical in this game
+    clippy::cast_precision_loss,
+    // Allow potential wrapping when casting between types of same size as we validate values are in range
+    clippy::cast_possible_wrap,
+    // Allow more than 3 bools in structs for game states and input handling where bools represent distinct flags
+    clippy::struct_excessive_bools
+)]
 
 use bevy_ecs::prelude::*;
 use crossterm::event::KeyEvent;
@@ -16,7 +28,8 @@ pub enum TetrominoType {
 }
 
 impl TetrominoType {
-    #[must_use] pub fn random() -> Self {
+    #[must_use]
+    pub fn random() -> Self {
         match fastrand::u8(0..7) {
             0 => TetrominoType::I,
             1 => TetrominoType::J,
@@ -28,7 +41,8 @@ impl TetrominoType {
         }
     }
 
-    #[must_use] pub fn get_blocks(&self) -> Vec<(i32, i32)> {
+    #[must_use]
+    pub fn get_blocks(self) -> Vec<(i32, i32)> {
         match self {
             TetrominoType::I => vec![(0, 0), (0, 1), (0, 2), (0, 3)],
             TetrominoType::J => vec![(0, 0), (0, 1), (0, 2), (-1, 2)],
@@ -40,7 +54,8 @@ impl TetrominoType {
         }
     }
 
-    #[must_use] pub fn get_color(&self) -> ratatui::style::Color {
+    #[must_use]
+    pub fn get_color(self) -> ratatui::style::Color {
         match self {
             TetrominoType::I => ratatui::style::Color::Cyan,
             TetrominoType::J => ratatui::style::Color::Blue,
@@ -66,14 +81,16 @@ pub struct Tetromino {
 }
 
 impl Tetromino {
-    #[must_use] pub fn new(tetromino_type: TetrominoType) -> Self {
+    #[must_use]
+    pub fn new(tetromino_type: TetrominoType) -> Self {
         Self {
             tetromino_type,
             rotation: 0,
         }
     }
 
-    #[must_use] pub fn get_blocks(&self) -> Vec<(i32, i32)> {
+    #[must_use]
+    pub fn get_blocks(self) -> Vec<(i32, i32)> {
         let blocks = self.tetromino_type.get_blocks();
         match self.rotation {
             0 => blocks,
@@ -97,7 +114,8 @@ pub struct Board {
 }
 
 impl Board {
-    #[must_use] pub fn new(width: usize, height: usize) -> Self {
+    #[must_use]
+    pub fn new(width: usize, height: usize) -> Self {
         Self {
             width,
             height,
@@ -113,7 +131,8 @@ impl Board {
         }
     }
 
-    #[must_use] pub fn is_valid_position(&self, position: &Position, tetromino: &Tetromino) -> bool {
+    #[must_use]
+    pub fn is_valid_position(&self, position: Position, tetromino: &Tetromino) -> bool {
         let blocks = tetromino.get_blocks();
 
         for (block_x, block_y) in blocks {
@@ -121,7 +140,11 @@ impl Board {
             let y = position.y + block_y;
 
             // Check if block is out of bounds
-            if x < 0 || x >= self.width as i32 || y < 0 || y >= self.height as i32 {
+            if x < 0
+                || x >= i32::try_from(self.width).unwrap_or(i32::MAX)
+                || y < 0
+                || y >= i32::try_from(self.height).unwrap_or(i32::MAX)
+            {
                 return false;
             }
 
@@ -134,24 +157,30 @@ impl Board {
         true
     }
 
-    pub fn lock_tetromino(&mut self, position: &Position, tetromino: &Tetromino) {
+    pub fn lock_tetromino(&mut self, position: Position, tetromino: &Tetromino) {
         let blocks = tetromino.get_blocks();
 
         for (block_x, block_y) in blocks {
             let x = position.x + block_x;
             let y = position.y + block_y;
 
-            if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
+            if x >= 0
+                && x < i32::try_from(self.width).unwrap_or(i32::MAX)
+                && y >= 0
+                && y < i32::try_from(self.height).unwrap_or(i32::MAX)
+            {
                 self.cells[x as usize][y as usize] = Some(tetromino.tetromino_type);
             }
         }
     }
 
-    pub fn clear_lines(&mut self) -> usize {
+    /// Clears completed lines and returns the number of lines cleared and their indices
+    pub fn clear_lines_with_indices(&mut self) -> (usize, Vec<usize>) {
         let mut lines_cleared = 0;
+        let mut cleared_indices = Vec::new();
 
+        // First identify which lines need to be cleared
         for y in 0..self.height {
-            // Check if line is full
             let mut is_line_full = true;
             for x in 0..self.width {
                 if self.cells[x][y].is_none() {
@@ -161,85 +190,88 @@ impl Board {
             }
 
             if is_line_full {
-                // Move all lines above down one
-                for y2 in (1..=y).rev() {
-                    for x in 0..self.width {
-                        self.cells[x][y2] = self.cells[x][y2 - 1];
-                    }
-                }
-
-                // Clear top line
-                for x in 0..self.width {
-                    self.cells[x][0] = None;
-                }
-
-                lines_cleared += 1;
+                cleared_indices.push(y);
             }
         }
 
-        lines_cleared
+        // Then clear them from bottom to top to avoid affecting indices
+        for &y in cleared_indices.iter().rev() {
+            // Move all lines above down one
+            for y2 in (1..=y).rev() {
+                for x in 0..self.width {
+                    self.cells[x][y2] = self.cells[x][y2 - 1];
+                }
+            }
+
+            // Clear top line
+            for x in 0..self.width {
+                self.cells[x][0] = None;
+            }
+
+            lines_cleared += 1;
+        }
+
+        (lines_cleared, cleared_indices)
     }
 }
 
-#[derive(Resource, Debug)]
+#[derive(Debug, Resource, Clone)]
 pub struct GameState {
-    pub last_key: Option<KeyEvent>,
-    pub last_move: Instant,
-    pub game_over: bool,
     pub score: u32,
     pub level: u32,
     pub lines_cleared: u32,
+    pub game_over: bool,
+    pub tetris_count: u32,
+    pub t_spin_count: u32,
+    pub perfect_clear_count: u32,
+    pub combo_count: u32,
+    pub back_to_back: bool,
+    pub next_tetromino: Option<TetrominoType>,
+    pub last_move: Instant,
+    pub last_key: Option<KeyEvent>,
+    pub was_paused_for_resize: bool,
+    pub hard_drop_distance: u32,
     pub drop_timer: f32,
-    pub was_paused_for_resize: bool, // Track if the game was paused for resize
-    pub coyote_time_active: bool, // Track if coyote time is active, for last chance to move/rotate
-    pub coyote_time_timer: f32,   // Track coyote time duration
-    pub combo_count: u32,         // Track consecutive line clears
-    pub back_to_back: bool,       // Track back-to-back tetris/t-spin
-    pub last_clear_was_difficult: bool, // Track if last clear was a tetris or t-spin
-    pub soft_drop_distance: u32,  // Track soft drop distance for current piece
-    pub hard_drop_distance: u32,  // Track hard drop distance for current piece
-    pub t_spin_count: u32,        // Track total t-spins performed
-    pub tetris_count: u32,        // Track total tetris clears
-    pub perfect_clear_count: u32, // Track total perfect clears
-    pub next_tetromino: Option<TetrominoType>, // Store the next tetromino to be spawned
+    pub coyote_time_active: bool,
+    pub coyote_time_timer: f32,
+    pub soft_drop_distance: u32,
+    pub last_clear_was_difficult: bool,
 }
 
 impl Default for GameState {
     fn default() -> Self {
         Self {
-            last_key: None,
-            last_move: Instant::now(),
-            game_over: false,
             score: 0,
             level: crate::game::STARTING_LEVEL,
             lines_cleared: 0,
-            drop_timer: 0.0,
-            was_paused_for_resize: false,
-            coyote_time_active: false,
-            coyote_time_timer: 0.0,
-            // Initialize new metrics
+            game_over: false,
+            tetris_count: 0,
+            t_spin_count: 0,
+            perfect_clear_count: 0,
             combo_count: 0,
             back_to_back: false,
-            last_clear_was_difficult: false,
-            soft_drop_distance: 0,
-            hard_drop_distance: 0,
-            t_spin_count: 0,
-            tetris_count: 0,
-            perfect_clear_count: 0,
             next_tetromino: None,
+            last_move: Instant::now(),
+            last_key: None,
+            was_paused_for_resize: false,
+            hard_drop_distance: 0,
+            drop_timer: 0.0,
+            coyote_time_active: false,
+            coyote_time_timer: 0.0,
+            soft_drop_distance: 0,
+            last_clear_was_difficult: false,
         }
     }
 }
 
 impl GameState {
-    #[allow(dead_code)]
     pub fn reset(&mut self) {
         *self = Self::default();
     }
 
     // Check if board is completely clear (perfect clear)
-    #[allow(dead_code)]
-    #[must_use] pub fn is_perfect_clear(&self, board: &Board) -> bool {
+    #[must_use]
+    pub fn is_perfect_clear(board: &Board) -> bool {
         for y in 0..board.height {
             for x in 0..board.width {
                 if board.cells[x][y].is_some() {
@@ -255,7 +287,8 @@ impl GameState {
     // 1. The piece is a T tetromino
     // 2. The piece was just rotated (not moved)
     // 3. At least 3 of the 4 corners around the T center are blocked
-    #[must_use] pub fn is_t_spin(&self, board: &Board, position: &Position, tetromino: &Tetromino) -> bool {
+    #[must_use]
+    pub fn is_t_spin(board: &Board, position: Position, tetromino: &Tetromino) -> bool {
         // Check if this is a T tetromino
         if tetromino.tetromino_type != TetrominoType::T {
             return false;
@@ -277,12 +310,17 @@ impl GameState {
         let mut blocked_corners = 0;
         for (x, y) in &corners {
             // Check if corner is outside the board
-            if *x < 0 || *x >= board.width as i32 || *y < 0 || *y >= board.height as i32 {
+            if *x < 0
+                || *x >= i32::try_from(board.width).unwrap_or(i32::MAX)
+                || *y < 0
+                || *y >= i32::try_from(board.height).unwrap_or(i32::MAX)
+            {
                 blocked_corners += 1;
                 continue;
             }
 
             // Check if corner has a block
+            #[allow(clippy::cast_sign_loss)]
             if board.cells[*x as usize][*y as usize].is_some() {
                 blocked_corners += 1;
             }
@@ -378,7 +416,7 @@ impl GameState {
 
         // Update score
         self.score += total_points;
-        self.lines_cleared += lines_cleared as u32;
+        self.lines_cleared += u32::try_from(lines_cleared).unwrap_or(u32::MAX);
 
         // Update level based on lines cleared and score
         self.update_level();
@@ -407,7 +445,8 @@ impl GameState {
         );
     }
 
-    #[must_use] pub fn get_drop_delay(&self) -> f32 {
+    #[must_use]
+    pub fn get_drop_delay(&self) -> f32 {
         // Speed increases with level (faster drops as level increases)
         // More aggressive curve with higher levels
         if self.level < 10 {
@@ -447,10 +486,11 @@ pub struct ScreenShake {
     pub duration: f32,
     pub current_offset: (i16, i16),
     pub is_active: bool,
+    pub horizontal_bias: bool, // When true, shake will prioritize horizontal movement
 }
 
 // Input state for keyboard controls
-#[derive(Debug, Clone, Resource, Default)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct Input {
     pub left: bool,
     pub right: bool,
@@ -458,6 +498,9 @@ pub struct Input {
     pub rotate: bool,
     pub hard_drop: bool,
     pub hard_drop_released: bool, // Track if the hard drop key has been released
+    pub toggle_music: bool,       // Toggle background music on/off
+    pub volume_up: bool,          // Increase volume
+    pub volume_down: bool,        // Decrease volume
 }
 
 // Coyote time mechanic (last chance to move after landing)

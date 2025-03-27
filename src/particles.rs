@@ -1,12 +1,25 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    // Allow truncation when casting from usize to i32 since particle coordinates are always small enough to fit in i32
+    clippy::cast_possible_truncation,
+    // Allow sign loss when going from signed to unsigned types since we validate values are non-negative before casting
+    clippy::cast_sign_loss,
+    // Allow precision loss when casting between numeric types since exact precision isn't critical for particle effects
+    clippy::cast_precision_loss,
+    // Allow potential wrapping when casting between types of same size as we validate values are in range
+    clippy::cast_possible_wrap,
+    // Allow defining constants after statements in functions as it's clearer to define them near where they're used
+    clippy::items_after_statements
+)]
 
 use bevy_ecs::prelude::*;
 use log::{debug, trace};
 use ratatui::style::Color;
 
-use crate::components::{Particle, Position, ScreenShake, Tetromino};
+use crate::components::{Particle, Position, Tetromino};
+use crate::screenshake;
 
-pub fn spawn_lock_particles(world: &mut World, position: &Position, tetromino: &Tetromino) {
+pub fn spawn_lock_particles(world: &mut World, position: Position, tetromino: &Tetromino) {
     // Clear any existing coyote time particles first
     clear_coyote_time_particles(world);
 
@@ -46,10 +59,10 @@ pub fn spawn_lock_particles(world: &mut World, position: &Position, tetromino: &
     }
 
     // Trigger screen shake effect
-    trigger_screen_shake(world, 0.8, 0.3);
+    screenshake::trigger_screen_shake(world, 0.8, 0.3);
 }
 
-pub fn spawn_rotation_particles(world: &mut World, position: &Position, tetromino: &Tetromino) {
+pub fn spawn_rotation_particles(world: &mut World, position: Position, tetromino: &Tetromino) {
     trace!("Spawning rotation particles");
 
     // Get tetromino blocks to spawn particles at each block position
@@ -83,7 +96,7 @@ pub fn spawn_rotation_particles(world: &mut World, position: &Position, tetromin
     }
 }
 
-pub fn spawn_coyote_time_particles(world: &mut World, position: &Position, tetromino: &Tetromino) {
+pub fn spawn_coyote_time_particles(world: &mut World, position: Position, tetromino: &Tetromino) {
     // Only spawn particles if we haven't already spawned them for this position
     let already_has_particles = world
         .query::<&Particle>()
@@ -129,15 +142,15 @@ pub fn spawn_coyote_time_particles(world: &mut World, position: &Position, tetro
     }
 
     // Add screen shake with less intensity
-    trigger_screen_shake(world, 1.0, 0.1);
+    screenshake::trigger_screen_shake(world, 1.0, 0.1);
 }
 
 pub fn spawn_perfect_clear_particles(world: &mut World, board_width: usize, board_height: usize) {
     // Create a burst of particles across the entire bottom of the board
     for x in 0..board_width {
         let particle_pos = Position {
-            x: x as i32,
-            y: board_height as i32 - 1,
+            x: i32::try_from(x).unwrap_or(0),
+            y: i32::try_from(board_height).unwrap_or(i32::MAX) - 1,
         };
 
         // Spawn extra particles for impressive clears
@@ -157,7 +170,52 @@ pub fn spawn_perfect_clear_particles(world: &mut World, board_width: usize, boar
     }
 
     // Add intense screen shake for perfect clears
-    trigger_screen_shake(world, 5.0, 0.8);
+    screenshake::trigger_screen_shake(world, 5.0, 0.8);
+}
+
+/// Spawns particles for line clear effect
+pub fn spawn_line_clear_particles(world: &mut World, board_width: usize, lines: &[usize]) {
+    debug!("Spawning line clear particles for {} lines", lines.len());
+
+    // Create particles along each cleared line
+    for &y in lines {
+        for x in 0..board_width {
+            let particle_pos = Position {
+                x: i32::try_from(x).unwrap_or(0),
+                y: i32::try_from(y).unwrap_or(0),
+            };
+
+            // Choose color based on number of lines cleared
+            let color = match lines.len() {
+                2 => Color::LightBlue,
+                3 => Color::LightGreen,
+                4 => Color::LightYellow, // Tetris gets bright yellow
+                _ => Color::White,       // Single line clears get white
+            };
+
+            // Particles per cell depends on number of lines cleared
+            let particles_per_cell = 3 + lines.len();
+
+            // Create multiple particles per cell
+            for _ in 0..particles_per_cell {
+                // Horizontal bias for velocity
+                let vx = (fastrand::f32() - 0.5) * 8.0;
+                let vy = (fastrand::f32() - 0.5) * 3.0; // Less vertical movement
+
+                spawn_particle(
+                    world,
+                    particle_pos,
+                    (vx, vy),
+                    color,
+                    fastrand::f32() * 0.7 + 0.3, // lifetime: 0.3 to 1.0 seconds
+                    fastrand::f32() * 0.6 + 0.3, // size: 0.3 to 0.9
+                );
+            }
+        }
+    }
+
+    // Trigger the specialized line clear screen shake
+    screenshake::trigger_line_clear_shake(world, lines.len());
 }
 
 pub fn update_particles(world: &mut World, delta_seconds: f32) {
@@ -182,10 +240,15 @@ pub fn update_particles(world: &mut World, delta_seconds: f32) {
     // Update remaining particles
     for (_, mut particle) in world.query::<(Entity, &mut Particle)>().iter_mut(world) {
         // Update position based on velocity
-        particle.position.x =
-            (particle.position.x as f32 + particle.velocity.0 * delta_seconds) as i32;
-        particle.position.y =
-            (particle.position.y as f32 + particle.velocity.1 * delta_seconds) as i32;
+        #[allow(clippy::cast_precision_loss)]
+        let x_float = particle.position.x as f32;
+        let new_x = x_float + particle.velocity.0 * delta_seconds;
+        particle.position.x = new_x as i32;
+
+        #[allow(clippy::cast_precision_loss)]
+        let y_float = particle.position.y as f32;
+        let new_y = y_float + particle.velocity.1 * delta_seconds;
+        particle.position.y = new_y as i32;
 
         // Slow down velocity over time (friction)
         particle.velocity.0 *= 0.95;
@@ -195,7 +258,8 @@ pub fn update_particles(world: &mut World, delta_seconds: f32) {
         particle.velocity.1 += delta_seconds * 1.0;
     }
 
-    update_screen_shake(world, delta_seconds);
+    // Update screen shake using the dedicated module
+    screenshake::update_screen_shake(world, delta_seconds);
 }
 
 // Helper function to spawn a single particle
@@ -216,37 +280,6 @@ fn spawn_particle(
     });
 }
 
-// Helper function to trigger screen shake
-fn trigger_screen_shake(world: &mut World, intensity: f32, duration: f32) {
-    let mut screen_shake = world.resource_mut::<ScreenShake>();
-    screen_shake.intensity = intensity;
-    screen_shake.duration = duration;
-    trace!("Screen shake triggered with intensity {intensity}");
-}
-
-// Helper function to update screen shake
-fn update_screen_shake(world: &mut World, delta_seconds: f32) {
-    let mut screen_shake = world.resource_mut::<ScreenShake>();
-    if screen_shake.duration > 0.0 {
-        screen_shake.duration -= delta_seconds;
-
-        if screen_shake.duration <= 0.0 {
-            // Reset shake when duration expires
-            screen_shake.intensity = 0.0;
-            screen_shake.current_offset = (0, 0);
-        } else {
-            // Calculate random shake offset based on intensity
-            let intensity = screen_shake.intensity * (screen_shake.duration / 0.3); // Fade out
-            let max_offset = (intensity * 2.0) as i16;
-
-            screen_shake.current_offset = (
-                (fastrand::i16(0..=max_offset) - max_offset / 2),
-                (fastrand::i16(0..=max_offset) - max_offset / 2),
-            );
-        }
-    }
-}
-
 // Helper function to clear coyote time particles
 fn clear_coyote_time_particles(world: &mut World) {
     let particles_to_remove: Vec<Entity> = world
@@ -258,5 +291,57 @@ fn clear_coyote_time_particles(world: &mut World) {
 
     for entity in particles_to_remove {
         world.despawn(entity);
+    }
+}
+
+pub fn create_random_menu_particle() -> Particle {
+    // Random position along the top or sides of the screen
+    let (x, y, vx, vy) = match fastrand::u8(0..3) {
+        0 => {
+            // Top - fall down
+            let x = fastrand::f32() * 100.0;
+            let y = -5.0;
+            let vx = (fastrand::f32() - 0.5) * 0.5; // Minimal horizontal movement
+            let vy = fastrand::f32() * 0.5 + 0.1; // Falling down
+            (x, y, vx, vy)
+        }
+        1 => {
+            // Left side - move right
+            let x = -5.0;
+            let y = fastrand::f32() * 30.0;
+            let vx = fastrand::f32() * 0.5 + 0.1; // Moving right
+            let vy = (fastrand::f32() - 0.5) * 0.5; // Minimal vertical movement
+            (x, y, vx, vy)
+        }
+        _ => {
+            // Right side - move left
+            let x = 100.0;
+            let y = fastrand::f32() * 30.0;
+            let vx = -fastrand::f32() * 0.5 - 0.1; // Moving left
+            let vy = (fastrand::f32() - 0.5) * 0.5; // Minimal vertical movement
+            (x, y, vx, vy)
+        }
+    };
+
+    // Choose a random color
+    let color = match fastrand::u8(0..6) {
+        0 => Color::Red,
+        1 => Color::Green,
+        2 => Color::Yellow,
+        3 => Color::Blue,
+        4 => Color::Magenta,
+        _ => Color::Cyan,
+    };
+
+    // Create the particle
+    Particle {
+        position: Position {
+            x: x as i32,
+            y: y as i32,
+        },
+        velocity: (vx, vy),
+        lifetime: fastrand::f32() * 10.0 + 5.0, // Long-lived particles for menu
+        color,
+        size: fastrand::f32() * 0.5 + 0.5, // Medium sized
     }
 }

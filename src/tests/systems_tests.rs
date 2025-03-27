@@ -33,8 +33,13 @@ mod tests {
             duration: 0.0,
             current_offset: (0, 0),
             is_active: false,
+            horizontal_bias: false,
         };
         world.insert_resource(screen_shake);
+
+        // Add AudioState resource to fix test failures
+        let audio_state = crate::sound::AudioState::new();
+        world.insert_resource(audio_state);
 
         world
     }

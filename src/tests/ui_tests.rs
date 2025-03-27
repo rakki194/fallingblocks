@@ -46,7 +46,7 @@ mod tests {
 
         // Test with a very small terminal - increase the height to 20 to ensure it's big enough
         let small_area = Rect::new(0, 0, 30, 20);
-        let (small_board_width, small_board_height, small_cell_width, small_cell_height) =
+        let (small_board_width, _small_board_height, small_cell_width, small_cell_height) =
             calculate_responsive_board_size(small_area);
 
         // Board should still fit
@@ -75,6 +75,9 @@ mod tests {
         // Create a very small terminal that can't fit the game
         let mut terminal = create_test_terminal(20, 10);
         let mut app = App::new();
+
+        // Set the menu state to Game so render_game gets called
+        app.menu.state = crate::menu_types::MenuState::Game;
 
         // This should show the warning screen and not crash
         terminal.draw(|f| ui::render(f, &mut app)).unwrap();

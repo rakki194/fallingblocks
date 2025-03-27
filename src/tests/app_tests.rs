@@ -12,10 +12,13 @@ mod tests {
 
         // Verify initial state
         assert!(!app.should_quit);
-        assert!(!app.game_over);
-        assert_eq!(app.score, 0);
         assert_eq!(app.level, 1);
         assert_eq!(app.lines_cleared, 0);
+
+        // Check for game_over and score in GameState resource
+        let game_state = app.world.resource::<GameState>();
+        assert!(!game_state.game_over);
+        assert_eq!(game_state.score, 0);
 
         // Check world was initialized with required resources
         assert!(app.world.contains_resource::<GameState>());
@@ -42,6 +45,9 @@ mod tests {
     #[test]
     fn test_get_render_blocks() {
         let mut app = App::new();
+
+        // Spawn a tetromino first to ensure there is one
+        crate::systems::spawn_tetromino(&mut app.world);
 
         // First check: initial state should have 4 blocks (active tetromino)
         let initial_blocks = app.get_render_blocks();

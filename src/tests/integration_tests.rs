@@ -40,6 +40,10 @@ mod tests {
         // Create a new app
         let mut app = App::new();
 
+        // Add AudioState resource to fix test failures
+        let audio_state = crate::sound::AudioState::new();
+        app.world.insert_resource(audio_state);
+
         // Make sure we have a tetromino to work with
         let has_tetromino = app.world.query::<&Tetromino>().iter(&app.world).count() > 0;
 

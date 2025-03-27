@@ -1,4 +1,20 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    // Allow truncation when casting from usize to i32 since game board dimensions are always small enough to fit in i32
+    clippy::cast_possible_truncation,
+    // Allow sign loss when going from signed to unsigned types since we validate values are non-negative before casting
+    clippy::cast_sign_loss,
+    // Allow precision loss when casting between numeric types since exact precision isn't critical for game mechanics
+    clippy::cast_precision_loss,
+    // Allow potential wrapping when casting between types of same size as we validate values are in range
+    clippy::cast_possible_wrap,
+    // Allow functions with many lines as game logic is complex and splitting would reduce readability
+    clippy::too_many_lines,
+    // Allow passing small copyable types by reference to maintain consistent API across the codebase
+    clippy::trivially_copy_pass_by_ref,
+    // Allow missing panic documentation since panics are rare and only happen in development
+    clippy::missing_panics_doc
+)]
 
 use bevy_ecs::prelude::*;
 use log::{debug, info, trace};
@@ -9,6 +25,7 @@ use crate::components::{
 };
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::particles;
+use crate::sound::{AudioState, SoundEffect};
 
 pub fn spawn_tetromino(world: &mut World) {
     // Make sure input state is clear when spawning a new tetromino
@@ -43,13 +60,13 @@ pub fn spawn_tetromino(world: &mut World) {
 
     // Start position at the top center of the board
     let position = Position {
-        x: (BOARD_WIDTH / 2) as i32,
+        x: i32::try_from(BOARD_WIDTH / 2).unwrap_or(0),
         y: 0,
     };
 
     // Check if spawn position is valid
     let board = world.resource::<Board>();
-    if !board.is_valid_position(&position, &tetromino) {
+    if !board.is_valid_position(position, &tetromino) {
         // Game over if we can't spawn a new tetromino
         let mut game_state = world.resource_mut::<GameState>();
         game_state.game_over = true;
@@ -64,13 +81,14 @@ pub fn spawn_tetromino(world: &mut World) {
 }
 
 // Helper function to check if a tetromino can continue falling
+#[allow(clippy::needless_pass_by_value)]
 fn can_continue_falling(world: &mut World, position: &Position, tetromino: &Tetromino) -> bool {
     let new_position = Position {
         x: position.x,
         y: position.y + 1,
     };
     let board = world.resource::<Board>();
-    board.is_valid_position(&new_position, tetromino)
+    board.is_valid_position(new_position, tetromino)
 }
 
 pub fn input_system(world: &mut World) {
@@ -78,15 +96,16 @@ pub fn input_system(world: &mut World) {
     let input = world.resource::<Input>().clone();
     let screen_shake = world.resource::<ScreenShake>().clone();
 
-    // Check if game is paused for resize
-    let is_paused = {
-        let game_state = world.resource::<GameState>();
-        game_state.was_paused_for_resize
-    };
-
-    // Skip input processing if game is paused for resize
-    if is_paused {
+    // Skip inputs if game is paused for resize
+    let game_state = world.resource::<GameState>();
+    if game_state.was_paused_for_resize {
         return;
+    }
+
+    // Track when this move occurred
+    {
+        let mut game_state = world.resource_mut::<GameState>();
+        game_state.last_move = std::time::Instant::now();
     }
 
     // Check if screen shake is active
@@ -133,9 +152,10 @@ pub fn input_system(world: &mut World) {
     }
 
     // If no tetromino found, exit early
-    let (entity, tetromino, position) = match (entity_id, tetromino_clone, position_clone) {
-        (Some(e), Some(t), Some(p)) => (e, t, p),
-        _ => return,
+    let (Some(entity), Some(tetromino), Some(position)) =
+        (entity_id, tetromino_clone, position_clone)
+    else {
+        return;
     };
 
     // Handle horizontal movement
@@ -149,7 +169,7 @@ pub fn input_system(world: &mut World) {
         // Check if the move is valid
         let can_move = {
             let board = world.resource::<Board>();
-            board.is_valid_position(&new_position, &tetromino)
+            board.is_valid_position(new_position, &tetromino)
         };
 
         if can_move {
@@ -160,7 +180,7 @@ pub fn input_system(world: &mut World) {
                     y: new_position.y + 1,
                 };
                 let board = world.resource::<Board>();
-                board.is_valid_position(&down_pos, &tetromino)
+                board.is_valid_position(down_pos, &tetromino)
             };
 
             // Update position
@@ -178,8 +198,12 @@ pub fn input_system(world: &mut World) {
                 debug!(
                     "Spawning coyote time particles due to horizontal movement during coyote time"
                 );
-                particles::spawn_coyote_time_particles(world, &new_position, &tetromino);
+                particles::spawn_coyote_time_particles(world, new_position, &tetromino);
             }
+
+            // Play movement sound effect
+            let audio_state = world.resource::<AudioState>();
+            audio_state.play_sound(SoundEffect::Move);
         }
     }
 
@@ -193,7 +217,7 @@ pub fn input_system(world: &mut World) {
         // Check if the move is valid
         let can_move_down = {
             let board = world.resource::<Board>();
-            board.is_valid_position(&new_position, &tetromino)
+            board.is_valid_position(new_position, &tetromino)
         };
 
         if can_move_down {
@@ -229,10 +253,14 @@ pub fn input_system(world: &mut World) {
                     world.despawn(entity);
                 }
             }
+
+            // Play soft drop sound effect
+            let audio_state = world.resource::<AudioState>();
+            audio_state.play_sound(SoundEffect::SoftDrop);
         } else {
             // When we can't move down during soft drop, we should lock immediately
             // instead of activating coyote time
-            handle_piece_lock(world, entity, &position, &tetromino);
+            handle_piece_lock(world, entity, position, &tetromino);
             return; // Exit early to prevent any other movement processing
         }
     }
@@ -245,7 +273,7 @@ pub fn input_system(world: &mut World) {
         // Check if the rotation is valid
         let can_rotate = {
             let board = world.resource::<Board>();
-            board.is_valid_position(&position, &new_tetromino)
+            board.is_valid_position(position, &new_tetromino)
         };
 
         if can_rotate {
@@ -256,7 +284,7 @@ pub fn input_system(world: &mut World) {
                     y: position.y + 1,
                 };
                 let board = world.resource::<Board>();
-                board.is_valid_position(&down_pos, &new_tetromino)
+                board.is_valid_position(down_pos, &new_tetromino)
             };
 
             // Update tetromino
@@ -265,14 +293,18 @@ pub fn input_system(world: &mut World) {
             // Add rotation effect
             if fastrand::f32() < 0.3 {
                 // Only 30% chance to spawn particles for rotation
-                particles::spawn_rotation_particles(world, &position, &new_tetromino);
+                particles::spawn_rotation_particles(world, position, &new_tetromino);
             }
 
             // Only spawn coyote time particles if we can't move down
             if coyote_time_active && !can_move_down {
                 debug!("Spawning coyote time particles due to rotation during coyote time");
-                particles::spawn_coyote_time_particles(world, &position, &new_tetromino);
+                particles::spawn_coyote_time_particles(world, position, &new_tetromino);
             }
+
+            // Play rotation sound effect
+            let audio_state = world.resource::<AudioState>();
+            audio_state.play_sound(SoundEffect::Rotate);
         }
     }
 }
@@ -294,9 +326,10 @@ fn handle_hard_drop(world: &mut World) {
     }
 
     // If no tetromino found, exit early
-    let (entity, tetromino, position) = match (entity_id, tetromino_clone, position_clone) {
-        (Some(e), Some(t), Some(p)) => (e, t, p),
-        _ => return,
+    let (Some(entity), Some(tetromino), Some(position)) =
+        (entity_id, tetromino_clone, position_clone)
+    else {
+        return;
     };
 
     // Calculate drop distance
@@ -310,7 +343,7 @@ fn handle_hard_drop(world: &mut World) {
         loop {
             test_y += 1;
             if !board.is_valid_position(
-                &Position {
+                Position {
                     x: position.x,
                     y: test_y,
                 },
@@ -337,18 +370,49 @@ fn handle_hard_drop(world: &mut World) {
     // Lock the tetromino at the final position
     {
         let mut board = world.resource_mut::<Board>();
-        board.lock_tetromino(&final_position, &tetromino);
+        board.lock_tetromino(final_position, &tetromino);
     }
 
     // Spawn particles for the locked tetromino
-    particles::spawn_lock_particles(world, &final_position, &tetromino);
+    particles::spawn_lock_particles(world, final_position, &tetromino);
 
     // Remove the tetromino and spawn a new one
     world.despawn(entity);
     spawn_tetromino(world);
+
+    // Play hard drop sound effect
+    let audio_state = world.resource::<AudioState>();
+    audio_state.play_sound(SoundEffect::HardDrop);
+}
+
+/// Process audio controls (music toggle, volume adjustments)
+fn process_audio_controls(world: &mut World) {
+    let input = world.resource::<Input>().clone();
+    let mut audio_state = world.resource_mut::<AudioState>();
+
+    // Handle music toggle
+    if input.toggle_music {
+        audio_state.toggle_music();
+    }
+
+    // Handle volume adjustments (0.05 increments)
+    const VOLUME_STEP: f32 = 0.05;
+
+    if input.volume_up {
+        let current_volume = audio_state.get_volume();
+        audio_state.set_volume(current_volume + VOLUME_STEP);
+    }
+
+    if input.volume_down {
+        let current_volume = audio_state.get_volume();
+        audio_state.set_volume(current_volume - VOLUME_STEP);
+    }
 }
 
 pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
+    // Process audio controls first
+    process_audio_controls(world);
+
     // Log delta seconds for debugging
     trace!("Game tick with delta: {delta_seconds}");
 
@@ -443,7 +507,7 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
                 game_state.drop_timer = 0.0;
             } else {
                 // Handle locking the piece
-                handle_piece_lock(world, entity, &position, &tetromino);
+                handle_piece_lock(world, entity, position, &tetromino);
             }
         }
         return;
@@ -527,7 +591,7 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
 
         let can_move_down = {
             let board = world.resource::<Board>();
-            board.is_valid_position(&new_position, &tetromino)
+            board.is_valid_position(new_position, &tetromino)
         };
 
         if can_move_down {
@@ -543,26 +607,20 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
                 game_state.coyote_time_timer = 0.0;
 
                 // Spawn initial coyote time particles to give visual feedback
-                particles::spawn_coyote_time_particles(world, &position, &tetromino);
+                particles::spawn_coyote_time_particles(world, position, &tetromino);
             }
         }
     }
 }
 
 // Update handle_piece_lock to use the new particle module
-fn handle_piece_lock(
-    world: &mut World,
-    entity: Entity,
-    position: &Position,
-    tetromino: &Tetromino,
-) {
+fn handle_piece_lock(world: &mut World, entity: Entity, position: Position, tetromino: &Tetromino) {
     info!("Locking tetromino in place");
 
     // Check for T-spin before locking
     let is_t_spin = {
         let board = world.resource::<Board>();
-        let game_state = world.resource::<GameState>();
-        game_state.is_t_spin(board, position, tetromino)
+        GameState::is_t_spin(board, position, tetromino)
     };
 
     // First lock the tetromino
@@ -575,23 +633,20 @@ fn handle_piece_lock(
     particles::spawn_lock_particles(world, position, tetromino);
 
     // Then clear lines and check for perfect clear
-    let (lines_cleared, is_perfect_clear) = {
+    let (lines_cleared, is_perfect_clear, cleared_line_indices) = {
         let mut board = world.resource_mut::<Board>();
 
-        // Clear completed lines
-        let lines_cleared = board.clear_lines();
+        // Clear completed lines and get their indices
+        let (lines_cleared, cleared_line_indices) = board.clear_lines_with_indices();
 
         // Check for perfect clear
         let is_perfect_clear = if lines_cleared > 0 {
-            let cells = board.cells.clone();
-            cells
-                .iter()
-                .all(|row| row.iter().all(std::option::Option::is_none))
+            GameState::is_perfect_clear(&board)
         } else {
             false
         };
 
-        (lines_cleared, is_perfect_clear)
+        (lines_cleared, is_perfect_clear, cleared_line_indices)
     };
 
     // Update score if needed
@@ -603,9 +658,24 @@ fn handle_piece_lock(
         let mut game_state = world.resource_mut::<GameState>();
         game_state.update_score(lines_cleared, is_t_spin, is_perfect_clear);
 
+        // Spawn line clear particles
+        particles::spawn_line_clear_particles(world, BOARD_WIDTH, &cleared_line_indices);
+
         // Spawn special particles for perfect clears
         if is_perfect_clear {
             particles::spawn_perfect_clear_particles(world, BOARD_WIDTH, BOARD_HEIGHT);
+        }
+
+        // Play appropriate sound effect based on the type of clear
+        let audio_state = world.resource::<AudioState>();
+        if is_perfect_clear {
+            audio_state.play_sound(SoundEffect::PerfectClear);
+        } else if lines_cleared == 4 {
+            audio_state.play_sound(SoundEffect::Tetris);
+        } else if is_t_spin {
+            audio_state.play_sound(SoundEffect::TSpin);
+        } else {
+            audio_state.play_sound(SoundEffect::LineClear);
         }
     } else {
         // Reset combo counter if no lines were cleared

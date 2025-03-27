@@ -1,14 +1,47 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    // Allow truncation when casting from usize to u16 since UI dimensions are always small enough to fit in u16
+    clippy::cast_possible_truncation,
+    // Allow sign loss when going from signed to unsigned types since we validate values are non-negative before casting
+    clippy::cast_sign_loss,
+    // Allow precision loss when casting between numeric types since exact precision isn't critical for UI rendering
+    clippy::cast_precision_loss,
+    // Allow potential wrapping when casting between types of same size as UI values are in reasonable ranges
+    clippy::cast_possible_wrap,
+    // Allow functions with many lines for complex UI rendering logic where splitting would reduce readability
+    clippy::too_many_lines,
+    // Allow underscore bindings that don't have side effects in UI code for consistency with naming patterns
+    clippy::no_effect_underscore_binding
+)]
 
 use crate::app::App;
 use crate::components::{GameState, Particle, ScreenShake};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
+use crate::menu::MenuRenderer;
+use crate::menu_types::{MenuOption, MenuState, OptionsOption};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 pub fn render(f: &mut Frame, app: &mut App) {
+    if app.menu.state == MenuState::Game {
+        render_game(f, app);
+    } else {
+        // Update the menu renderer first
+        app.menu_renderer.update();
+
+        // Clone the menu state to avoid borrow issues
+        let menu_state = app.menu.clone();
+        let menu_renderer = &app.menu_renderer;
+
+        // Render the menu
+        MenuRenderer::render_menu(f, app, &menu_state, menu_renderer);
+    }
+}
+
+/// Render the main game UI
+fn render_game(f: &mut Frame, app: &mut App) {
     // Get available area
     let available_area = f.area();
 
@@ -24,9 +57,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
     {
         // Pause the game by updating the game state
         let mut game_state = app.world.resource_mut::<GameState>();
-        if !game_state.game_over {
-            game_state.was_paused_for_resize = true;
-        }
+        // Always set was_paused_for_resize to true regardless of game_over state
+        game_state.was_paused_for_resize = true;
 
         // Create a warning message block
         let warning_text = Paragraph::new(
@@ -69,7 +101,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
         70 // Default to 70% when plenty of space
     } else {
         // Calculate minimum percentage needed for the game board
-        let min_game_percent = (f32::from(board_width) / f32::from(shake_area.width) * 100.0) as u16;
+        let min_game_percent =
+            (f32::from(board_width) / f32::from(shake_area.width) * 100.0) as u16;
         // Cap between 50% and 80% to ensure info panel is still usable
         min_game_percent.clamp(50, 80)
     };
@@ -97,8 +130,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     let (final_board_width, final_board_height, final_cell_width, final_cell_height) =
         if board_height > available_board_height {
             // Recalculate with height constraint
-            let height_constrained_width =
-                (f32::from(available_board_height) * (BOARD_WIDTH as f32 / BOARD_HEIGHT as f32)) as u16;
+            let height_constrained_width = (f32::from(available_board_height)
+                * (BOARD_WIDTH as f32 / BOARD_HEIGHT as f32))
+                as u16;
             let new_cell_width = (height_constrained_width / BOARD_WIDTH as u16).max(2);
             let new_cell_height = (new_cell_width / 2).max(1);
 
@@ -123,12 +157,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
         .split(game_area);
 
     // Board area - center horizontally within available space
-    let board_area = Rect {
-        x: game_layout[1].x + (game_layout[1].width.saturating_sub(final_board_width)) / 2,
-        y: game_layout[1].y + (game_layout[1].height.saturating_sub(final_board_height)) / 2,
-        width: final_board_width,
-        height: final_board_height,
-    };
+    let board_area =
+        centered_horizontal_rect(final_board_width, final_board_height, game_layout[1]);
 
     // Define the info panel layout
     let info_layout = Layout::default()
@@ -163,7 +193,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(5), // Basic stats
             Constraint::Length(5), // Achievement stats
-            Constraint::Min(3),    // Current status
+            Constraint::Length(3), // Current status (fixed height)
         ])
         .split(info_layout[1]);
 
@@ -215,17 +245,30 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
     let back_to_back_text = if back_to_back { "Back-to-Back" } else { "" };
 
-    let current_status = if game_state.game_over {
-        Paragraph::new("GAME OVER!\nPress Enter to restart")
-            .style(Style::default().fg(Color::Red))
-            .block(Block::default().borders(Borders::NONE))
-            .wrap(Wrap { trim: true })
+    let status_text = if game_state.game_over {
+        "GAME OVER!\nPress Enter to restart".to_string()
     } else {
-        Paragraph::new(format!("{combo_text}\n{back_to_back_text}"))
-            .style(Style::default().fg(combo_color))
-            .block(Block::default().borders(Borders::NONE))
-            .wrap(Wrap { trim: true })
+        let mut text = String::new();
+        if !combo_text.is_empty() {
+            text.push_str(&combo_text);
+        }
+        if !back_to_back_text.is_empty() {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(back_to_back_text);
+        }
+        text
     };
+
+    let current_status = Paragraph::new(status_text)
+        .style(Style::default().fg(if game_state.game_over {
+            Color::Red
+        } else {
+            combo_color
+        }))
+        .block(Block::default().borders(Borders::NONE))
+        .wrap(Wrap { trim: true });
 
     f.render_widget(current_status, stats_layout[2]);
 
@@ -248,7 +291,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
 }
 
 /// Calculate the responsive board size based on available area
-#[must_use] pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
+#[must_use]
+pub fn calculate_responsive_board_size(area: Rect) -> (u16, u16, u16, u16) {
     // Calculate the available space
     let available_width = area.width.saturating_sub(4); // Subtract margin
     let available_height = area.height.saturating_sub(4); // Subtract margin
@@ -280,14 +324,15 @@ pub fn render(f: &mut Frame, app: &mut App) {
     (board_width, board_height, cell_width, cell_height)
 }
 
-/// Center a rectangle horizontally within a larger rectangle
-#[must_use] pub fn centered_horizontal_rect(width: u16, r: Rect) -> Rect {
+#[must_use]
+pub fn centered_horizontal_rect(width: u16, height: u16, r: Rect) -> Rect {
     let x = r.x + (r.width.saturating_sub(width)) / 2;
+    let y = r.y + (r.height.saturating_sub(height)) / 2;
     Rect {
         x,
-        y: r.y,
+        y,
         width: width.min(r.width), // Ensure it doesn't exceed available width
-        height: r.height,
+        height: height.min(r.height), // Ensure it doesn't exceed available height
     }
 }
 
@@ -408,7 +453,8 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, c
 }
 
 /// Helper function to create a centered rect using up certain percentage of the available rect
-#[must_use] pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+#[must_use]
+pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

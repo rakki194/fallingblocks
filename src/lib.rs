@@ -3,7 +3,11 @@
 pub mod app;
 pub mod components;
 pub mod game;
+pub mod menu;
+pub mod menu_types;
 pub mod particles;
+pub mod screenshake;
+pub mod sound;
 pub mod systems;
 pub mod ui;
 
@@ -20,7 +24,8 @@ pub struct Time {
 }
 
 impl Time {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             delta: Duration::default(),
             last_update: Instant::now(),
@@ -33,7 +38,8 @@ impl Time {
         self.last_update = now;
     }
 
-    #[must_use] pub fn delta_seconds(&self) -> f32 {
+    #[must_use]
+    pub fn delta_seconds(&self) -> f32 {
         self.delta.as_secs_f32()
     }
 }

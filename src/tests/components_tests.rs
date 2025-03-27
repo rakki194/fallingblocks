@@ -171,7 +171,7 @@ mod board_tests {
 
         // Block position in the middle of the board
         let valid_pos = Position { x: 5, y: 5 };
-        assert!(board.is_valid_position(&valid_pos, &test_tetromino));
+        assert!(board.is_valid_position(valid_pos, &test_tetromino));
 
         // Out of bounds positions
         let out_left = Position { x: -1, y: 5 };
@@ -185,14 +185,14 @@ mod board_tests {
             y: BOARD_HEIGHT as i32,
         };
 
-        assert!(!board.is_valid_position(&out_left, &test_tetromino));
-        assert!(!board.is_valid_position(&out_right, &test_tetromino));
-        assert!(!board.is_valid_position(&out_bottom, &test_tetromino));
-        assert!(!board.is_valid_position(&out_top, &test_tetromino));
+        assert!(!board.is_valid_position(out_left, &test_tetromino));
+        assert!(!board.is_valid_position(out_right, &test_tetromino));
+        assert!(!board.is_valid_position(out_bottom, &test_tetromino));
+        assert!(!board.is_valid_position(out_top, &test_tetromino));
 
         // Place a block and check collision
         board.cells[5][5] = Some(TetrominoType::I);
-        assert!(!board.is_valid_position(&valid_pos, &test_tetromino));
+        assert!(!board.is_valid_position(valid_pos, &test_tetromino));
     }
 
     #[test]
@@ -210,10 +210,11 @@ mod board_tests {
         }
 
         // Clear lines and check the result
-        let lines_cleared = board.clear_lines();
+        let (lines_cleared, cleared_indices) = board.clear_lines_with_indices();
 
         // Should have cleared one line
         assert_eq!(lines_cleared, 1);
+        assert_eq!(cleared_indices, vec![0]);
 
         // Check that cells moved down correctly
         // The top row (index 0) is cleared after moving lines down
