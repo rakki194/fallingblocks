@@ -427,12 +427,18 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, c
                 let color = particle.color;
 
                 // Different particle size based on the size attribute
-                let particle_size = if particle.size > 0.7 {
-                    "█" // Full block for larger particles
+                let particle_size = if particle.size > 0.85 {
+                    "█" // Full block for largest particles
+                } else if particle.size > 0.7 {
+                    "▇" // Nearly full block
+                } else if particle.size > 0.55 {
+                    "▆" // Mostly full block
                 } else if particle.size > 0.4 {
-                    "▓" // Medium density for medium particles
+                    "▓" // Medium density
+                } else if particle.size > 0.25 {
+                    "▒" // Low-medium density
                 } else {
-                    "▒" // Low density for small particles
+                    "░" // Very low density
                 };
 
                 // Draw particle (applying the same cell size as game blocks)

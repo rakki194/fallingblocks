@@ -256,6 +256,15 @@ pub fn update_particles(world: &mut World, delta_seconds: f32) {
 
         // Add some gravity
         particle.velocity.1 += delta_seconds * 1.0;
+
+        // Gradually decrease size as lifetime decreases, for smoother fade-out
+        // Store initial size in an arbitrary safe range (most particles are < 1.0)
+        let max_lifetime = 10.0; // Reasonable maximum lifetime estimate
+        let fade_factor = (particle.lifetime / max_lifetime).min(1.0);
+
+        // Apply non-linear fade for smoother transition
+        // Use a quadratic curve for more graceful fade-out
+        particle.size = particle.size * (0.6 + 0.4 * fade_factor * fade_factor);
     }
 
     // Update screen shake using the dedicated module
@@ -271,12 +280,16 @@ fn spawn_particle(
     lifetime: f32,
     size: f32,
 ) {
+    // Distribute particle sizes more evenly across the whole range
+    // Make sure to preserve the base size while adding more variance
+    let adjusted_size = size * (0.7 + fastrand::f32() * 0.6);
+
     world.spawn(Particle {
         position,
         velocity,
         color,
         lifetime,
-        size,
+        size: adjusted_size,
     });
 }
 
