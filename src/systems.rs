@@ -28,6 +28,17 @@ use crate::particles;
 use crate::sound::{AudioState, SoundEffect};
 
 pub fn spawn_tetromino(world: &mut World) {
+    // First, despawn any existing tetromino entities to avoid multiple tetrominos on screen
+    let entities_to_despawn: Vec<Entity> = world
+        .query::<(Entity, &Tetromino)>()
+        .iter(world)
+        .map(|(entity, _)| entity)
+        .collect();
+
+    for entity in entities_to_despawn {
+        world.despawn(entity);
+    }
+
     // Make sure input state is clear when spawning a new tetromino
     // While preserving the hard_drop_released flag
     if let Some(mut input) = world.get_resource_mut::<Input>() {

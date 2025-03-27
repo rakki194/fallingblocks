@@ -26,7 +26,7 @@ use crossterm::{
 use fallingblocks::Time;
 use log::{debug, error, info};
 use ratatui::{Terminal, prelude::*};
-use sound::AudioState;
+use sound::{AudioState, SoundEffect};
 
 fn main() -> AppResult<()> {
     // Create log file and redirect stderr to it
@@ -172,18 +172,33 @@ fn run_app<B: Backend>(
                             {
                                 app.should_quit = true;
                             } else {
-                                // Store the current menu state to avoid nested borrows
-                                let current_menu_state = app.menu.state.clone();
-
-                                // Process select action based on menu state
-                                match current_menu_state {
+                                // Handle menu selection based on current state and option
+                                match app.menu.state {
                                     menu_types::MenuState::MainMenu => {
                                         match app.menu.selected_option {
                                             menu_types::MenuOption::NewGame => {
+                                                // Play sound effect
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    if audio_state.is_sound_enabled() {
+                                                        audio_state
+                                                            .play_sound(SoundEffect::LevelUp);
+                                                    }
+                                                }
+                                                // Change state and reset app
                                                 app.menu.state = menu_types::MenuState::Game;
                                                 app.reset();
                                             }
                                             menu_types::MenuOption::Options => {
+                                                // Play sound effect
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    if audio_state.is_sound_enabled() {
+                                                        audio_state.play_sound(SoundEffect::Move);
+                                                    }
+                                                }
                                                 app.menu.state = menu_types::MenuState::Options;
                                             }
                                             _ => {}

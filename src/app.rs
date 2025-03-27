@@ -125,6 +125,9 @@ impl App {
             .get_resource::<AudioState>()
             .map(|audio| audio.get_volume());
 
+        // Save current menu state
+        let current_menu_state = self.menu.state.clone();
+
         // Reset game state
         let game_state = GameState::default();
         self.world.insert_resource(game_state);
@@ -153,9 +156,10 @@ impl App {
         }
         self.world.insert_resource(audio_state);
 
-        // Reset menu state
-        self.menu = Menu::new();
+        // Reset menu renderer while preserving the menu state
         self.menu_renderer = MenuRenderer::new();
+        self.menu = Menu::new();
+        self.menu.state = current_menu_state;
 
         // Reset game stats
         self.level = 1;
