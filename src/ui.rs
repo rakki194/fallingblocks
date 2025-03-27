@@ -17,8 +17,7 @@
 use crate::app::App;
 use crate::components::{GameState, Particle, ScreenShake};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
-use crate::menu::MenuRenderer;
-use crate::menu_types::{MenuOption, MenuState, OptionsOption};
+use crate::menu::{Menu, MenuOption, MenuRenderer, MenuState, OptionsOption};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -31,12 +30,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
         // Update the menu renderer first
         app.menu_renderer.update();
 
-        // Clone the menu state to avoid borrow issues
-        let menu_state = app.menu.clone();
-        let menu_renderer = &app.menu_renderer;
-
         // Render the menu
-        MenuRenderer::render_menu(f, app, &menu_state, menu_renderer);
+        MenuRenderer::render_menu(f, app, &app.menu, &app.menu_renderer);
     }
 }
 

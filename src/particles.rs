@@ -263,7 +263,7 @@ pub fn update_particles(world: &mut World, delta_seconds: f32) {
 }
 
 // Helper function to spawn a single particle
-fn spawn_particle(
+pub fn spawn_particle(
     world: &mut World,
     position: Position,
     velocity: (f32, f32),
@@ -281,7 +281,7 @@ fn spawn_particle(
 }
 
 // Helper function to clear coyote time particles
-fn clear_coyote_time_particles(world: &mut World) {
+pub fn clear_coyote_time_particles(world: &mut World) {
     let particles_to_remove: Vec<Entity> = world
         .query::<(Entity, &Particle)>()
         .iter(world)

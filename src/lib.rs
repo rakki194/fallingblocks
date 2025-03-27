@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod components;
+pub mod config;
 pub mod game;
 pub mod menu;
 pub mod menu_types;
@@ -49,3 +50,14 @@ impl Default for Time {
         Self::new()
     }
 }
+
+pub use app::App;
+pub use components::{Board, Ghost, Input, Position, Tetromino, TetrominoType};
+pub use config::{CONFIG, Config};
+pub use menu::{Menu, MenuOption, MenuState, OptionsOption};
+pub use particles::{
+    clear_coyote_time_particles, spawn_coyote_time_particles, spawn_line_clear_particles,
+    spawn_lock_particles, spawn_particle, spawn_perfect_clear_particles, spawn_rotation_particles,
+};
+pub use sound::{AudioState, SoundEffect};
+pub use systems::*;

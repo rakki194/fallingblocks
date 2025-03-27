@@ -3,13 +3,17 @@
 // Test modules
 pub mod app_tests;
 pub mod components_tests;
+pub mod config_loader_tests;
+pub mod config_tests;
 pub mod game_tests;
 pub mod integration_tests;
-//pub mod particles_tests;
-//pub mod screenshake_tests;
+pub mod menu_config_tests;
+pub mod particles_tests;
+pub mod screenshake_tests;
 pub mod sound_tests;
 pub mod systems_tests;
 pub mod time_tests;
+pub mod title_config_tests;
 pub mod ui_tests;
 
 // Import test utilities
