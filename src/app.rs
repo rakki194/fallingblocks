@@ -109,9 +109,6 @@ impl App {
     }
 
     pub fn on_tick(&mut self) {
-        // Check for configuration changes
-        let _ = crate::config::Config::check_and_reload();
-
         // Update last key if needed
         let input = self.world.resource::<Input>();
         if input.left || input.right || input.down || input.rotate || input.hard_drop {
@@ -127,11 +124,6 @@ impl App {
             .world
             .get_resource::<AudioState>()
             .map(|audio| audio.get_volume());
-
-        let audio_music_enabled = self
-            .world
-            .get_resource::<AudioState>()
-            .map(|audio| audio.is_music_enabled());
 
         // Reset game state
         let game_state = GameState::default();
@@ -158,11 +150,6 @@ impl App {
         let mut audio_state = AudioState::new();
         if let Some(vol) = audio_vol {
             audio_state.set_volume(vol);
-        }
-        if let Some(music_enabled) = audio_music_enabled {
-            if music_enabled {
-                audio_state.toggle_music();
-            }
         }
         self.world.insert_resource(audio_state);
 

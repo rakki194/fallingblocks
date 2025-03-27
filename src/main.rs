@@ -2,7 +2,6 @@
 
 mod app;
 mod components;
-mod config;
 mod game;
 mod menu;
 mod menu_types;
@@ -61,14 +60,6 @@ fn main() -> AppResult<()> {
         .init();
 
     info!("Starting Tetris");
-
-    // Initialize configuration system
-    if let Err(e) = config::loader::load_config_from_file() {
-        error!("Failed to load configuration: {:?}", e);
-        // Continue with default configuration
-    } else {
-        info!("Configuration loaded successfully");
-    }
 
     // Terminal initialization
     enable_raw_mode()?;
@@ -131,54 +122,11 @@ fn run_app<B: Backend>(
 
     debug!("Resources initialized");
 
-    // Flag to track if we've already warned about audio device issues
-    let mut audio_error_logged = false;
-
     loop {
         // Draw the UI
         if last_render.elapsed() >= tick_rate {
             terminal.draw(|f| ui::render(f, &mut app))?;
             last_render = Instant::now();
-        }
-
-        // Check if any systems need updating
-        if last_game_tick.elapsed() >= game_tick_rate {
-            let delta_seconds = last_game_tick.elapsed().as_secs_f32();
-            last_game_tick = Instant::now();
-
-            // Update time resource
-            {
-                let mut time = app.world.resource_mut::<Time>();
-                time.update();
-            }
-
-            // Check audio system status
-            let audio_unavailable = {
-                let audio_state = app.world.resource::<AudioState>();
-                !audio_state.is_audio_available()
-            };
-
-            // If audio device is unavailable and we haven't logged it yet, log it once
-            if audio_unavailable && !audio_error_logged {
-                error!("Audio device is unavailable. Continuing without sound.");
-                audio_error_logged = true;
-            }
-
-            // Exit if needed
-            if app.should_quit {
-                return Ok(());
-            }
-
-            // Only run game systems if in game state
-            if app.menu.state == menu_types::MenuState::Game {
-                // Run game systems
-                systems::input_system(&mut app.world);
-                systems::game_tick_system(&mut app.world, delta_seconds);
-                app.sync_game_state();
-            }
-
-            // Run general app update
-            app.on_tick();
         }
 
         // Process keyboard input
@@ -224,61 +172,61 @@ fn run_app<B: Backend>(
                             {
                                 app.should_quit = true;
                             } else {
-                                // Store current state before borrowing
-                                let menu_state = app.menu.state.clone();
+                                // Store the current menu state to avoid nested borrows
+                                let current_menu_state = app.menu.state.clone();
 
-                                // Handle main menu selection
-                                if menu_state == menu_types::MenuState::MainMenu {
-                                    if matches!(
-                                        app.menu.selected_option,
-                                        menu_types::MenuOption::NewGame
-                                    ) {
-                                        app.menu.state = menu_types::MenuState::Game;
-                                        app.reset();
-                                    } else if matches!(
-                                        app.menu.selected_option,
-                                        menu_types::MenuOption::Options
-                                    ) {
-                                        app.menu.state = menu_types::MenuState::Options;
-                                    }
-                                }
-                                // Handle options menu selection
-                                else if menu_state == menu_types::MenuState::Options {
-                                    match app.menu.options_selected {
-                                        menu_types::OptionsOption::MusicToggle => {
-                                            if let Some(mut audio_state) =
-                                                app.world.get_resource_mut::<AudioState>()
-                                            {
-                                                audio_state.toggle_music();
+                                // Process select action based on menu state
+                                match current_menu_state {
+                                    menu_types::MenuState::MainMenu => {
+                                        match app.menu.selected_option {
+                                            menu_types::MenuOption::NewGame => {
+                                                app.menu.state = menu_types::MenuState::Game;
+                                                app.reset();
                                             }
-                                        }
-                                        menu_types::OptionsOption::SoundToggle => {
-                                            if let Some(mut audio_state) =
-                                                app.world.get_resource_mut::<AudioState>()
-                                            {
-                                                audio_state.toggle_sound();
+                                            menu_types::MenuOption::Options => {
+                                                app.menu.state = menu_types::MenuState::Options;
                                             }
-                                        }
-                                        menu_types::OptionsOption::VolumeUp => {
-                                            if let Some(mut audio_state) =
-                                                app.world.get_resource_mut::<AudioState>()
-                                            {
-                                                let volume = audio_state.get_volume();
-                                                audio_state.set_volume((volume + 0.1).min(1.0));
-                                            }
-                                        }
-                                        menu_types::OptionsOption::VolumeDown => {
-                                            if let Some(mut audio_state) =
-                                                app.world.get_resource_mut::<AudioState>()
-                                            {
-                                                let volume = audio_state.get_volume();
-                                                audio_state.set_volume((volume - 0.1).max(0.0));
-                                            }
-                                        }
-                                        menu_types::OptionsOption::Back => {
-                                            app.menu.state = menu_types::MenuState::MainMenu;
+                                            _ => {}
                                         }
                                     }
+                                    menu_types::MenuState::Options => {
+                                        match app.menu.options_selected {
+                                            menu_types::OptionsOption::MusicToggle => {
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    audio_state.toggle_music();
+                                                }
+                                            }
+                                            menu_types::OptionsOption::SoundToggle => {
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    audio_state.toggle_sound();
+                                                }
+                                            }
+                                            menu_types::OptionsOption::VolumeUp => {
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    let volume = audio_state.get_volume();
+                                                    audio_state.set_volume((volume + 0.1).min(1.0));
+                                                }
+                                            }
+                                            menu_types::OptionsOption::VolumeDown => {
+                                                if let Some(mut audio_state) =
+                                                    app.world.get_resource_mut::<AudioState>()
+                                                {
+                                                    let volume = audio_state.get_volume();
+                                                    audio_state.set_volume((volume - 0.1).max(0.0));
+                                                }
+                                            }
+                                            menu_types::OptionsOption::Back => {
+                                                app.menu.state = menu_types::MenuState::MainMenu;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -402,6 +350,38 @@ fn run_app<B: Backend>(
                 let mut game_state = app.world.resource_mut::<GameState>();
                 game_state.last_key = Some(key);
             }
+        }
+
+        // Update game logic at a fixed rate
+        if last_game_tick.elapsed() >= game_tick_rate {
+            // First update time and get delta
+            let delta_seconds = {
+                let mut time = app.world.resource_mut::<Time>();
+                time.update();
+                time.delta_seconds()
+            };
+
+            debug!("Game tick at time: {:?}", Instant::now());
+
+            // Process input first
+            systems::input_system(&mut app.world);
+
+            // Then update game state
+            systems::game_tick_system(&mut app.world, delta_seconds);
+
+            // Sync game state with app
+            app.sync_game_state();
+
+            // Reset input state after processing
+            let mut input = app.world.resource_mut::<Input>();
+            *input = Input::default();
+
+            last_game_tick = Instant::now();
+        }
+
+        if app.should_quit {
+            info!("Game quit by user");
+            return Ok(());
         }
     }
 }
