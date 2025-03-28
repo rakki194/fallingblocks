@@ -348,15 +348,20 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, 
 
     // Render each block
     for (position, tetromino_type) in blocks {
-        let x = position.x as u16;
-        let y = position.y as u16;
+        let x = position.x.clamp(0, (BOARD_WIDTH - 1) as i32) as u16;
+        let y = position.y.clamp(0, (BOARD_HEIGHT - 1) as i32) as u16;
 
         // Each cell is sized according to calculated dimensions
         if x < BOARD_WIDTH as u16 && y < BOARD_HEIGHT as u16 {
-            let block_x = inner_area.left() + x * cell_width;
+            let block_x = inner_area
+                .left()
+                .saturating_add(x.saturating_mul(cell_width));
 
             // Fix: Invert Y coordinate to start from the bottom instead of the top
-            let block_y = inner_area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y) * cell_height;
+            let block_y = inner_area.bottom().saturating_sub(1).saturating_sub(
+                ((BOARD_HEIGHT as u16).saturating_sub(1).saturating_sub(y))
+                    .saturating_mul(cell_height),
+            );
 
             if block_x < inner_area.right() && block_y < inner_area.bottom() {
                 let color = tetromino_type.get_color();
@@ -394,7 +399,7 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, 
 
         let game_over_area = Rect {
             x: inner_area.x,
-            y: inner_area.y + (inner_area.height / 2),
+            y: inner_area.y.saturating_add(inner_area.height / 2),
             width: inner_area.width,
             height: 1,
         };
@@ -413,44 +418,43 @@ fn render_particles(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, c
         .collect::<Vec<_>>();
 
     for particle in particles_data {
-        let x = particle.position.x as u16;
-        let y = particle.position.y as u16;
+        // Convert position to u16, clamping to board boundaries
+        let x = particle.position.x.clamp(0, (BOARD_WIDTH - 1) as i32) as u16;
+        let y = particle.position.y.clamp(0, (BOARD_HEIGHT - 1) as i32) as u16;
 
-        // Check if particle is inside the board area
-        if x < BOARD_WIDTH as u16 && y < BOARD_HEIGHT as u16 {
-            let particle_x = area.left() + x * cell_width;
+        // Calculate screen position
+        let particle_x = area.left().saturating_add(x.saturating_mul(cell_width));
+        let particle_y = area.bottom().saturating_sub(1).saturating_sub(
+            ((BOARD_HEIGHT as u16).saturating_sub(1).saturating_sub(y)).saturating_mul(cell_height),
+        );
 
-            // Use the same Y-coordinate calculation as the game board
-            let particle_y = area.bottom() - 1 - ((BOARD_HEIGHT as u16 - 1) - y) * cell_height;
+        // Only render if within screen bounds
+        if particle_x < area.right() && particle_y < area.bottom() {
+            let color = particle.color;
 
-            if particle_x < area.right() && particle_y < area.bottom() {
-                let color = particle.color;
+            // Different particle size based on the size attribute
+            let particle_size = if particle.size > 0.85 {
+                "█" // Full block for largest particles
+            } else if particle.size > 0.7 {
+                "▇" // Nearly full block
+            } else if particle.size > 0.55 {
+                "▆" // Mostly full block
+            } else if particle.size > 0.4 {
+                "▓" // Medium density
+            } else if particle.size > 0.25 {
+                "▒" // Low-medium density
+            } else {
+                "░" // Very low density
+            };
 
-                // Different particle size based on the size attribute
-                let particle_size = if particle.size > 0.85 {
-                    "█" // Full block for largest particles
-                } else if particle.size > 0.7 {
-                    "▇" // Nearly full block
-                } else if particle.size > 0.55 {
-                    "▆" // Mostly full block
-                } else if particle.size > 0.4 {
-                    "▓" // Medium density
-                } else if particle.size > 0.25 {
-                    "▒" // Low-medium density
-                } else {
-                    "░" // Very low density
-                };
-
-                // Draw particle (applying the same cell size as game blocks)
-                for dx in 0..cell_width {
-                    for dy in 0..cell_height.min(1) {
-                        // Limit particle height to 1 for better aesthetics
-                        if let Some(cell) =
-                            f.buffer_mut().cell_mut((particle_x + dx, particle_y - dy))
-                        {
-                            cell.set_symbol(particle_size);
-                            cell.set_fg(color);
-                        }
+            // Draw particle (applying the same cell size as game blocks)
+            for dx in 0..cell_width {
+                for dy in 0..cell_height.min(1) {
+                    // Limit particle height to 1 for better aesthetics
+                    if let Some(cell) = f.buffer_mut().cell_mut((particle_x + dx, particle_y - dy))
+                    {
+                        cell.set_symbol(particle_size);
+                        cell.set_fg(color);
                     }
                 }
             }
@@ -529,18 +533,22 @@ pub fn render_next_tetromino(f: &mut Frame, app: &mut App, area: Rect) {
             let block_height = (block_width / 2).max(1);
 
             // Center the tetromino in the preview area
-            let total_width = width * block_width;
-            let total_height = height * block_height;
+            let total_width = width.saturating_mul(block_width);
+            let total_height = height.saturating_mul(block_height);
 
-            let start_x = inner_area.left() + (available_width - total_width) / 2;
-            let start_y = inner_area.top() + (available_height - total_height) / 2;
+            let start_x = inner_area
+                .left()
+                .saturating_add((available_width.saturating_sub(total_width)) / 2);
+            let start_y = inner_area
+                .top()
+                .saturating_add((available_height.saturating_sub(total_height)) / 2);
 
             let color = next_type.get_color();
 
             // Draw the tetromino blocks
             for &(x, y) in &blocks {
-                let block_x = start_x + (x - min_x) as u16 * block_width;
-                let block_y = start_y + (y - min_y) as u16 * block_height;
+                let block_x = start_x.saturating_add((x - min_x) as u16 * block_width);
+                let block_y = start_y.saturating_add((y - min_y) as u16 * block_height);
 
                 if block_x < inner_area.right() && block_y < inner_area.bottom() {
                     // Draw a single block with proper proportional size

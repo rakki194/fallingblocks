@@ -43,8 +43,6 @@ pub fn spawn_lock_particles(world: &mut World, position: Position, tetromino: &T
 
         // Create multiple particles per block
         for _ in 0..PARTICLES_PER_BLOCK {
-            // Create a more dramatic emission pattern
-            // Use polar coordinates for a more controlled spread
             let angle = fastrand::f32() * std::f32::consts::PI * 2.0;
             let speed = fastrand::f32() * 3.0 + 2.0; // Speed between 2 and 5
             let vx = angle.cos() * speed;
