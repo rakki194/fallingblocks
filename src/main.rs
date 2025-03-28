@@ -138,8 +138,9 @@ fn run_app<B: Backend>(
                 if key.kind == event::KeyEventKind::Release {
                     // Track key releases for key-repeat prevention
                     let mut input = app.world.resource_mut::<Input>();
-                    if key.code == KeyCode::Enter {
+                    if key.code == KeyCode::Char('e') {
                         input.hard_drop_released = true;
+                        debug!("E key released, setting hard_drop_released = true");
                     }
                     continue; // Skip the rest of the input processing for release events
                 }
@@ -350,11 +351,16 @@ fn run_app<B: Backend>(
                         KeyCode::Up | KeyCode::Char('w' | ' ') => {
                             input.rotate = true;
                         }
-                        KeyCode::Enter => {
+                        KeyCode::Char('e') => {
                             // Only set hard_drop to true if the key was previously released
                             if input.hard_drop_released {
                                 input.hard_drop = true;
                                 input.hard_drop_released = false; // Mark as not released until we see a release event
+                                debug!(
+                                    "E key pressed, setting hard_drop = true, hard_drop_released = false"
+                                );
+                            } else {
+                                debug!("E key pressed, but hard_drop_released is false, ignoring");
                             }
                         }
                         _ => (),

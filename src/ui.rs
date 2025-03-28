@@ -18,7 +18,7 @@ use crate::app::App;
 use crate::components::{GameState, Particle, ScreenShake};
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::menu::MenuRenderer;
-use crate::menu_types::{MenuOption, MenuState, OptionsOption};
+use crate::menu_types::{MenuState, OptionsOption};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -280,7 +280,7 @@ fn render_game(f: &mut Frame, app: &mut App) {
         "Controls:\n\
         ←/→: Move left/right\n\
         ↓: Soft drop\n\
-        Enter: Hard drop\n\
+        E: Hard drop\n\
         ↑/Space: Rotate\n\
         Q: Quit\n\
         ",

@@ -10,10 +10,6 @@
     clippy::cast_possible_wrap,
     // Allow functions with many lines as game logic is complex and splitting would reduce readability
     clippy::too_many_lines,
-    // Allow passing small copyable types by reference to maintain consistent API across the codebase
-    clippy::trivially_copy_pass_by_ref,
-    // Allow missing panic documentation since panics are rare and only happen in development
-    clippy::missing_panics_doc
 )]
 
 use bevy_ecs::prelude::*;
@@ -26,6 +22,8 @@ use crate::components::{
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::particles;
 use crate::sound::{AudioState, SoundEffect};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use std::time::{Duration, Instant};
 
 pub fn spawn_tetromino(world: &mut World) {
     // First, despawn any existing tetromino entities to avoid multiple tetrominos on screen
@@ -107,9 +105,21 @@ pub fn input_system(world: &mut World) {
     let input = world.resource::<Input>().clone();
     let screen_shake = world.resource::<ScreenShake>().clone();
 
+    // Log input state
+    debug!(
+        "Input state: left={}, right={}, down={}, rotate={}, hard_drop={}, hard_drop_released={}",
+        input.left,
+        input.right,
+        input.down,
+        input.rotate,
+        input.hard_drop,
+        input.hard_drop_released
+    );
+
     // Skip inputs if game is paused for resize
     let game_state = world.resource::<GameState>();
     if game_state.was_paused_for_resize {
+        debug!("Game paused for resize, skipping input");
         return;
     }
 
@@ -122,6 +132,7 @@ pub fn input_system(world: &mut World) {
     // Check if screen shake is active
     if screen_shake.is_active {
         // If screen shake is active, ignore inputs
+        debug!("Screen shake active, ignoring inputs");
         return;
     }
 
@@ -139,11 +150,13 @@ pub fn input_system(world: &mut World) {
     }
 
     if !has_active_tetromino {
+        debug!("No active tetromino, skipping input");
         return;
     }
 
     // Handle hard drop separately
     if input.hard_drop {
+        debug!("Hard drop input detected, triggering hard drop");
         handle_hard_drop(world);
         return;
     }
@@ -322,24 +335,33 @@ pub fn input_system(world: &mut World) {
 
 // Separate function for hard drop to avoid borrow checker issues
 fn handle_hard_drop(world: &mut World) {
+    debug!("Handle hard drop triggered");
+
     // Get the active tetromino
     let mut entity_id = None;
     let mut tetromino_clone = None;
     let mut position_clone = None;
+    let mut ghost_clone = None;
 
     {
         let mut query = world.query::<(Entity, &Tetromino, &Position, &Ghost)>();
-        if let Some((entity, tetromino, position, _)) = query.iter(world).next() {
-            entity_id = Some(entity);
-            tetromino_clone = Some(*tetromino);
-            position_clone = Some(*position);
+        let results: Vec<_> = query.iter(world).collect();
+        debug!("Found {} tetromino entities", results.len());
+
+        if let Some((entity, tetromino, position, ghost)) = results.first() {
+            entity_id = Some(*entity);
+            tetromino_clone = Some(**tetromino);
+            position_clone = Some(**position);
+            ghost_clone = Some(ghost.clone());
+            debug!("Found tetromino at position: {:?}", position);
         }
     }
 
     // If no tetromino found, exit early
-    let (Some(entity), Some(tetromino), Some(position)) =
-        (entity_id, tetromino_clone, position_clone)
+    let (Some(entity), Some(tetromino), Some(position), Some(_)) =
+        (entity_id, tetromino_clone, position_clone, ghost_clone)
     else {
+        debug!("No tetromino found, exiting hard drop");
         return;
     };
 
@@ -366,10 +388,19 @@ fn handle_hard_drop(world: &mut World) {
         }
     }
 
+    debug!("Hard drop distance: {}", hard_drop_distance);
+
+    // If there's nowhere to drop, just return
+    if hard_drop_distance == 0 {
+        debug!("Hard drop distance is 0, nothing to do");
+        return;
+    }
+
     // Update the game state with the hard drop distance for scoring
     {
         let mut game_state = world.resource_mut::<GameState>();
         game_state.update_hard_drop_score(hard_drop_distance);
+        debug!("Updated hard drop score");
     }
 
     // Update the position to the final position
@@ -378,22 +409,29 @@ fn handle_hard_drop(world: &mut World) {
         y: position.y + hard_drop_distance as i32,
     };
 
+    debug!("Final position: {:?}", final_position);
+
     // Lock the tetromino at the final position
     {
         let mut board = world.resource_mut::<Board>();
         board.lock_tetromino(final_position, &tetromino);
+        debug!("Locked tetromino at final position");
     }
 
     // Spawn particles for the locked tetromino
     particles::spawn_lock_particles(world, final_position, &tetromino);
+    debug!("Spawned lock particles");
 
     // Remove the tetromino and spawn a new one
     world.despawn(entity);
+    debug!("Despawned old tetromino");
     spawn_tetromino(world);
+    debug!("Spawned new tetromino");
 
     // Play hard drop sound effect
     let audio_state = world.resource::<AudioState>();
     audio_state.play_sound(SoundEffect::HardDrop);
+    debug!("Played hard drop sound effect");
 }
 
 /// Process audio controls (music toggle, volume adjustments)
@@ -420,6 +458,50 @@ fn process_audio_controls(world: &mut World) {
     }
 }
 
+// Function to update ghost piece position based on the active tetromino
+fn update_ghost_positions(world: &mut World) {
+    // Get all tetromino entities with their positions and ghosts
+    let mut entities_to_update = Vec::new();
+
+    {
+        let mut query = world.query::<(Entity, &Tetromino, &Position, &Ghost)>();
+        for (entity, tetromino, position, _) in query.iter(world) {
+            entities_to_update.push((entity, *tetromino, *position));
+        }
+    }
+
+    // Update each entity's ghost position
+    for (entity, tetromino, position) in entities_to_update {
+        // Calculate how far the tetromino can drop
+        let mut ghost_y = position.y;
+        let board = world.resource::<Board>();
+
+        // Find the lowest position the tetromino can be placed
+        loop {
+            ghost_y += 1;
+            let test_position = Position {
+                x: position.x,
+                y: ghost_y,
+            };
+
+            if !board.is_valid_position(test_position, &tetromino) {
+                // Go back one step since we found the first invalid position
+                ghost_y -= 1;
+                break;
+            }
+        }
+
+        // Update the ghost position
+        if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            if let Some(mut ghost) = entity_mut.get_mut::<Ghost>() {
+                // Only update y position, keep x the same as the tetromino
+                ghost.position.x = position.x;
+                ghost.position.y = ghost_y;
+            }
+        }
+    }
+}
+
 pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
     // Process audio controls first
     process_audio_controls(world);
@@ -439,6 +521,12 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
     if game_over {
         return;
     }
+
+    // Update ghost positions
+    update_ghost_positions(world);
+
+    // Update music based on current level
+    update_music_for_level(world);
 
     // Update coyote time
     let coyote_time_expired = {
@@ -622,6 +710,11 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
             }
         }
     }
+}
+
+// Function to update background music based on the current level
+fn update_music_for_level(world: &mut World) {
+    // Music system not implemented yet
 }
 
 // Update handle_piece_lock to use the new particle module

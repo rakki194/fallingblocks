@@ -7,6 +7,7 @@ pub mod game_tests;
 pub mod integration_tests;
 //pub mod particles_tests;
 //pub mod screenshake_tests;
+pub mod hard_drop_test;
 pub mod sound_tests;
 pub mod systems_tests;
 pub mod time_tests;

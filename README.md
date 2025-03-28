@@ -15,7 +15,7 @@ A terminal-based Tetris game implemented in Rust using `ratatui` for the termina
 - **←/→**: Move tetromino left/right
 - **↓**: Soft drop (move down faster)
 - **↑/Space**: Rotate tetromino
-- **D**: Hard drop (drop all the way down)
+- **E**: Hard drop (drop all the way down)
 - **Q**: Quit the game
 - **Enter**: Restart after game over
 
