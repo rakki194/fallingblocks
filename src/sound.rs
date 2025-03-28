@@ -5,6 +5,7 @@ use cpal::{FromSample, SizedSample};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use fundsp::hacker32::*;
 use std::thread;
+use std::time::{Duration, Instant};
 
 // Sound effects types that can be played
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,70 +116,203 @@ impl Default for AudioState {
 }
 
 fn run_audio_thread(receiver: Receiver<AudioCommand>) -> Result<()> {
-    // Get the default audio device
-    let host = cpal::default_host();
-    let device = host
-        .default_output_device()
-        .ok_or_else(|| anyhow::anyhow!("No audio output device found"))?;
-    let config = device.default_output_config()?;
+    let mut retry_count = 0;
+    const MAX_RETRIES: u32 = 3;
+    const RETRY_DELAY: Duration = Duration::from_secs(1);
 
-    // Simple audio state to track volume and music status
-    let mut volume = 0.5f32;
-    let mut music_enabled = true;
-
-    // Create a channel for sound effects to be handled by the audio callback
-    let (sound_sender, sound_receiver) = bounded::<SoundEffect>(64);
-    let (cmd_sender, cmd_receiver) = bounded::<(bool, f32)>(16); // for music state and volume
-
-    // Set up audio stream based on the device's sample format
-    let _stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => run_audio_stream::<f32>(
-            &device,
-            &config.into(),
-            sound_receiver,
-            cmd_receiver,
-            volume,
-            music_enabled,
-        )?,
-        cpal::SampleFormat::I16 => run_audio_stream::<i16>(
-            &device,
-            &config.into(),
-            sound_receiver,
-            cmd_receiver,
-            volume,
-            music_enabled,
-        )?,
-        cpal::SampleFormat::U16 => run_audio_stream::<u16>(
-            &device,
-            &config.into(),
-            sound_receiver,
-            cmd_receiver,
-            volume,
-            music_enabled,
-        )?,
-        _ => return Err(anyhow::anyhow!("Unsupported audio format")),
-    };
-
-    // Keep the thread alive and process commands
     loop {
-        match receiver.recv() {
-            Ok(command) => match command {
-                AudioCommand::PlaySound(effect) => {
-                    // Forward sound to the audio stream
-                    let _ = sound_sender.try_send(effect);
+        // Get the default audio device
+        let host = cpal::default_host();
+        eprintln!("Attempting to get audio device...");
+
+        // List available devices for debugging
+        match host.devices() {
+            Ok(devices) => {
+                eprintln!("Available audio devices:");
+                for (device_index, device) in devices.enumerate() {
+                    eprintln!(
+                        "Device #{}: {}",
+                        device_index,
+                        device
+                            .name()
+                            .unwrap_or_else(|_| "Unknown device".to_string())
+                    );
+                    if let Ok(config) = device.default_output_config() {
+                        eprintln!("  Default config: {:?}", config);
+                    }
                 }
-                AudioCommand::PlayMusic(enabled) => {
-                    music_enabled = enabled;
-                    let _ = cmd_sender.try_send((enabled, volume));
-                }
-                AudioCommand::SetVolume(new_volume) => {
-                    volume = new_volume;
-                    let _ = cmd_sender.try_send((music_enabled, volume));
-                }
-                AudioCommand::Quit => break,
-            },
-            Err(_) => break, // Channel closed
+            }
+            Err(e) => eprintln!("Failed to list audio devices: {}", e),
         }
+
+        // Try to find the pipewire device first
+        let device = match host.devices() {
+            Ok(mut devices) => devices
+                .find(|device| {
+                    device
+                        .name()
+                        .map(|name| name.contains("pipewire"))
+                        .unwrap_or(false)
+                })
+                .or_else(|| host.default_output_device()),
+            Err(_) => host.default_output_device(),
+        };
+
+        let device = match device {
+            Some(device) => {
+                eprintln!(
+                    "Selected audio device: {}",
+                    device
+                        .name()
+                        .unwrap_or_else(|_| "Unknown device".to_string())
+                );
+                device
+            }
+            None => {
+                eprintln!("No suitable audio device found");
+                if retry_count < MAX_RETRIES {
+                    eprintln!(
+                        "Retrying in 1 second... (attempt {}/{})",
+                        retry_count + 1,
+                        MAX_RETRIES
+                    );
+                    thread::sleep(RETRY_DELAY);
+                    retry_count += 1;
+                    continue;
+                }
+                return Err(anyhow::anyhow!(
+                    "No audio output device found after {} retries",
+                    MAX_RETRIES
+                ));
+            }
+        };
+
+        // Reset retry count on successful device acquisition
+        retry_count = 0;
+
+        eprintln!("Getting default output config...");
+        let config = match device.default_output_config() {
+            Ok(config) => {
+                eprintln!("Got output config: {:?}", config);
+                config
+            }
+            Err(e) => {
+                eprintln!("Failed to get default output config: {}", e);
+                if retry_count < MAX_RETRIES {
+                    eprintln!(
+                        "Retrying in 1 second... (attempt {}/{})",
+                        retry_count + 1,
+                        MAX_RETRIES
+                    );
+                    thread::sleep(RETRY_DELAY);
+                    retry_count += 1;
+                    continue;
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to get default output config after {} retries",
+                    MAX_RETRIES
+                ));
+            }
+        };
+
+        // Simple audio state to track volume and music status
+        let mut volume = 0.5f32;
+        let mut music_enabled = true;
+
+        // Create a channel for sound effects to be handled by the audio callback
+        let (sound_sender, sound_receiver) = bounded::<SoundEffect>(64);
+        let (cmd_sender, cmd_receiver) = bounded::<(bool, f32)>(16); // for music state and volume
+
+        eprintln!("Setting up audio stream...");
+        // Set up audio stream based on the device's sample format
+        let stream = match config.sample_format() {
+            cpal::SampleFormat::F32 => run_audio_stream::<f32>(
+                &device,
+                &config.into(),
+                sound_receiver,
+                cmd_receiver,
+                volume,
+                music_enabled,
+            ),
+            cpal::SampleFormat::I16 => run_audio_stream::<i16>(
+                &device,
+                &config.into(),
+                sound_receiver,
+                cmd_receiver,
+                volume,
+                music_enabled,
+            ),
+            cpal::SampleFormat::U16 => run_audio_stream::<u16>(
+                &device,
+                &config.into(),
+                sound_receiver,
+                cmd_receiver,
+                volume,
+                music_enabled,
+            ),
+            _ => return Err(anyhow::anyhow!("Unsupported audio format")),
+        };
+
+        let mut stream = match stream {
+            Ok(stream) => {
+                eprintln!("Successfully created audio stream");
+                stream
+            }
+            Err(e) => {
+                eprintln!("Failed to create audio stream: {}", e);
+                if retry_count < MAX_RETRIES {
+                    eprintln!(
+                        "Retrying in 1 second... (attempt {}/{})",
+                        retry_count + 1,
+                        MAX_RETRIES
+                    );
+                    thread::sleep(RETRY_DELAY);
+                    retry_count += 1;
+                    continue;
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to create audio stream after {} retries",
+                    MAX_RETRIES
+                ));
+            }
+        };
+
+        eprintln!("Audio system initialized successfully");
+        // Keep the thread alive and process commands
+        loop {
+            match receiver.recv() {
+                Ok(command) => match command {
+                    AudioCommand::PlaySound(effect) => {
+                        // Forward sound to the audio stream
+                        let _ = sound_sender.try_send(effect);
+                    }
+                    AudioCommand::PlayMusic(enabled) => {
+                        music_enabled = enabled;
+                        let _ = cmd_sender.try_send((enabled, volume));
+                    }
+                    AudioCommand::SetVolume(new_volume) => {
+                        volume = new_volume;
+                        let _ = cmd_sender.try_send((music_enabled, volume));
+                    }
+                    AudioCommand::Quit => return Ok(()),
+                },
+                Err(_) => break, // Channel closed
+            }
+        }
+
+        // If we get here, the channel was closed or there was an error
+        // Try to reconnect if we haven't exceeded max retries
+        if retry_count < MAX_RETRIES {
+            eprintln!(
+                "Audio stream disconnected, attempting to reconnect... (attempt {}/{})",
+                retry_count + 1,
+                MAX_RETRIES
+            );
+            thread::sleep(RETRY_DELAY);
+            retry_count += 1;
+            continue;
+        }
+        break;
     }
 
     Ok(())
