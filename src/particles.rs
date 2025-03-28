@@ -32,7 +32,7 @@ pub fn spawn_lock_particles(world: &mut World, position: Position, tetromino: &T
     let blocks = tetromino.get_blocks();
     let color = tetromino.tetromino_type.get_color();
 
-    const PARTICLES_PER_BLOCK: usize = 8;
+    const PARTICLES_PER_BLOCK: usize = 12;
 
     // Create particles for each block of the tetromino
     for (block_x, block_y) in blocks {
@@ -43,23 +43,26 @@ pub fn spawn_lock_particles(world: &mut World, position: Position, tetromino: &T
 
         // Create multiple particles per block
         for _ in 0..PARTICLES_PER_BLOCK {
-            // Random velocity (with upward bias for collision effect)
-            let vx = (fastrand::f32() - 0.5) * 4.0;
-            let vy = (fastrand::f32() - 0.7) * 4.0; // Bias upward
+            // Create a more dramatic emission pattern
+            // Use polar coordinates for a more controlled spread
+            let angle = fastrand::f32() * std::f32::consts::PI * 2.0;
+            let speed = fastrand::f32() * 3.0 + 2.0; // Speed between 2 and 5
+            let vx = angle.cos() * speed;
+            let vy = angle.sin() * speed;
 
             spawn_particle(
                 world,
                 block_pos,
                 (vx, vy),
                 color,
-                fastrand::f32() * 0.8 + 0.2, // lifetime: 0.2 to 1.0 seconds
-                fastrand::f32() * 0.8 + 0.2,
-            ); // size: 0.2 to 1.0
+                fastrand::f32() * 1.2 + 0.3, // lifetime: 0.3 to 1.5 seconds (increased)
+                fastrand::f32() * 1.2 + 0.4, // size: 0.4 to 1.6 (increased)
+            );
         }
     }
 
-    // Trigger screen shake effect
-    screenshake::trigger_screen_shake(world, 0.8, 0.3);
+    // Trigger screen shake effect with more intensity
+    screenshake::trigger_screen_shake(world, 1.2, 0.4); // Increased from 0.8, 0.3
 }
 
 pub fn spawn_rotation_particles(world: &mut World, position: Position, tetromino: &Tetromino) {
