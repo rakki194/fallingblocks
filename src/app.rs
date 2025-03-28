@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::Time;
 use crate::components::{Board, CoyoteTime, GameState, Input, ScreenShake, TetrominoType};
+use crate::config::Config;
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::menu::MenuRenderer;
 use crate::menu_types::Menu;
@@ -27,15 +28,30 @@ pub struct App {
     pub lines_cleared: u32,
     pub menu: Menu,
     pub menu_renderer: MenuRenderer,
+    pub config: Config,
 }
 
 impl App {
     pub fn new() -> Self {
+        // Load config first
+        let config = Config::load();
+
         let mut world = World::new();
         world.insert_resource(Time::new());
-        world.insert_resource(AudioState::new());
+
+        // Create AudioState initialized with config values
+        let mut audio_state = AudioState::new();
+        audio_state.set_music_enabled(config.music_enabled);
+        audio_state.set_sound_enabled(config.sound_enabled);
+        audio_state.set_volume(config.volume);
+        world.insert_resource(audio_state);
+
+        // Create GameState with config values
+        let mut game_state = GameState::default();
+        game_state.show_grid = config.show_grid;
+        world.insert_resource(game_state);
+
         world.insert_resource(Input::default());
-        world.insert_resource(GameState::default());
         world.insert_resource(ScreenShake::default());
         world.insert_resource(Board::new(BOARD_WIDTH, BOARD_HEIGHT));
         world.insert_resource(CoyoteTime::default());
@@ -48,12 +64,30 @@ impl App {
             lines_cleared: 0,
             menu: Menu::new(),
             menu_renderer: MenuRenderer::new(),
+            config,
         };
 
         // Spawn initial tetromino
         spawn_tetromino(&mut app.world);
 
         app
+    }
+
+    // Update config from current settings and save it to disk
+    pub fn save_config(&mut self) {
+        // Update config from current game state
+        if let Some(audio_state) = self.world.get_resource::<AudioState>() {
+            self.config.music_enabled = audio_state.is_music_enabled();
+            self.config.sound_enabled = audio_state.is_sound_enabled();
+            self.config.volume = audio_state.get_volume();
+        }
+
+        if let Some(game_state) = self.world.get_resource::<GameState>() {
+            self.config.show_grid = game_state.show_grid;
+        }
+
+        // Save config to disk
+        let _ = self.config.save(); // Ignore errors for now
     }
 
     pub fn get_render_blocks(
@@ -125,11 +159,30 @@ impl App {
             .get_resource::<AudioState>()
             .map(|audio| audio.get_volume());
 
+        let audio_music_enabled = self
+            .world
+            .get_resource::<AudioState>()
+            .map(|audio| audio.is_music_enabled());
+
+        let audio_sound_enabled = self
+            .world
+            .get_resource::<AudioState>()
+            .map(|audio| audio.is_sound_enabled());
+
+        let show_grid = self
+            .world
+            .get_resource::<GameState>()
+            .map(|game| game.show_grid);
+
         // Save current menu state
         let current_menu_state = self.menu.state.clone();
 
         // Reset game state
-        let game_state = GameState::default();
+        let mut game_state = GameState::default();
+        // Restore grid setting
+        if let Some(grid) = show_grid {
+            game_state.show_grid = grid;
+        }
         self.world.insert_resource(game_state);
 
         // Reset board
@@ -153,6 +206,12 @@ impl App {
         let mut audio_state = AudioState::new();
         if let Some(vol) = audio_vol {
             audio_state.set_volume(vol);
+        }
+        if let Some(music_enabled) = audio_music_enabled {
+            audio_state.set_music_enabled(music_enabled);
+        }
+        if let Some(sound_enabled) = audio_sound_enabled {
+            audio_state.set_sound_enabled(sound_enabled);
         }
         self.world.insert_resource(audio_state);
 

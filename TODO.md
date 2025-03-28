@@ -37,6 +37,8 @@
 - [ ] Background music
 - [ ] Color themes
 - [ ] Accessibility options
+- [ ] Transparent grid overlay for better cell visibility
+- [ ] Toggleable grid option in settings menu
 - [ ] Further optimize rendering for very large terminals
 - [ ] Extract constants to configuration file
 - [ ] Add proper error handling instead of unwrap()

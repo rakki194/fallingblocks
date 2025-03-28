@@ -343,6 +343,10 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, 
     // Render the game board border
     f.render_widget(Block::default().borders(Borders::ALL), area);
 
+    // Get game state to check if grid should be shown
+    let game_state = app.world.resource::<GameState>();
+    let show_grid = game_state.show_grid;
+
     // Get blocks to render using the app's helper method
     let blocks = app.get_render_blocks();
 
@@ -389,6 +393,59 @@ fn render_game_board(f: &mut Frame, app: &mut App, area: Rect, cell_width: u16, 
 
     // Render particles
     render_particles(f, app, inner_area, cell_width, cell_height);
+
+    // Draw grid if enabled (draw on top of blocks for better visibility)
+    if show_grid {
+        // Set grid color - a subtle dark gray for visibility but not distracting
+        let grid_color = Color::DarkGray;
+
+        // Draw vertical grid lines
+        for x in 0..=BOARD_WIDTH {
+            let grid_x = inner_area.left().saturating_add(x as u16 * cell_width);
+
+            // Skip if out of bounds
+            if grid_x >= inner_area.right() {
+                continue;
+            }
+
+            // Draw vertical line
+            for y in 0..inner_area.height {
+                if let Some(cell) = f.buffer_mut().cell_mut((grid_x, inner_area.top() + y)) {
+                    // Use dotted line style for grid ('+' for intersections, '|' for vertical lines)
+                    if y % 2 == 0 {
+                        let is_intersection =
+                            x % (BOARD_WIDTH + 1) == 0 && y as usize % (BOARD_HEIGHT + 1) == 0;
+                        cell.set_symbol(if is_intersection { "+" } else { "│" });
+                        cell.set_fg(grid_color);
+                    }
+                }
+            }
+        }
+
+        // Draw horizontal grid lines
+        for y in 0..=BOARD_HEIGHT {
+            let grid_y = inner_area
+                .bottom()
+                .saturating_sub(1)
+                .saturating_sub(y as u16 * cell_height);
+
+            // Skip if out of bounds
+            if grid_y < inner_area.top() {
+                continue;
+            }
+
+            // Draw horizontal line
+            for x in 0..inner_area.width {
+                if let Some(cell) = f.buffer_mut().cell_mut((inner_area.left() + x, grid_y)) {
+                    // Use dotted line style for grid
+                    if x % 2 == 0 {
+                        cell.set_symbol("─");
+                        cell.set_fg(grid_color);
+                    }
+                }
+            }
+        }
+    }
 
     // If game is over, overlay "GAME OVER" text
     let game_state = app.world.resource::<GameState>();

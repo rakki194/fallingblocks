@@ -236,6 +236,7 @@ pub struct GameState {
     pub coyote_time_timer: f32,
     pub soft_drop_distance: u32,
     pub last_clear_was_difficult: bool,
+    pub show_grid: bool,
 }
 
 impl Default for GameState {
@@ -260,6 +261,7 @@ impl Default for GameState {
             coyote_time_timer: 0.0,
             soft_drop_distance: 0,
             last_clear_was_difficult: false,
+            show_grid: false,
         }
     }
 }

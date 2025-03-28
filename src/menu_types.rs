@@ -20,6 +20,7 @@ pub enum OptionsOption {
     SoundToggle,
     VolumeUp,
     VolumeDown,
+    GridToggle,
     Back,
 }
 

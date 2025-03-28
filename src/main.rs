@@ -2,6 +2,7 @@
 
 mod app;
 mod components;
+mod config;
 mod game;
 mod menu;
 mod menu_types;
@@ -17,6 +18,7 @@ use std::time::{Duration, Instant};
 
 use app::{App, AppResult};
 use components::{Board, GameState, Input};
+use config::Config;
 use crossterm::event::KeyCode;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event},
@@ -223,6 +225,8 @@ fn run_app<B: Backend>(
                                                     app.world.get_resource_mut::<AudioState>()
                                                 {
                                                     audio_state.toggle_music();
+                                                    // Save config after changing settings
+                                                    app.save_config();
                                                 }
                                             }
                                             menu_types::OptionsOption::SoundToggle => {
@@ -230,6 +234,8 @@ fn run_app<B: Backend>(
                                                     app.world.get_resource_mut::<AudioState>()
                                                 {
                                                     audio_state.toggle_sound();
+                                                    // Save config after changing settings
+                                                    app.save_config();
                                                 }
                                             }
                                             menu_types::OptionsOption::VolumeUp => {
@@ -238,6 +244,8 @@ fn run_app<B: Backend>(
                                                 {
                                                     let volume = audio_state.get_volume();
                                                     audio_state.set_volume((volume + 0.1).min(1.0));
+                                                    // Save config after changing settings
+                                                    app.save_config();
                                                 }
                                             }
                                             menu_types::OptionsOption::VolumeDown => {
@@ -246,6 +254,18 @@ fn run_app<B: Backend>(
                                                 {
                                                     let volume = audio_state.get_volume();
                                                     audio_state.set_volume((volume - 0.1).max(0.0));
+                                                    // Save config after changing settings
+                                                    app.save_config();
+                                                }
+                                            }
+                                            menu_types::OptionsOption::GridToggle => {
+                                                if let Some(mut game_state) =
+                                                    app.world.get_resource_mut::<GameState>()
+                                                {
+                                                    // Toggle grid visibility
+                                                    game_state.show_grid = !game_state.show_grid;
+                                                    // Save config after changing settings
+                                                    app.save_config();
                                                 }
                                             }
                                             menu_types::OptionsOption::Back => {
@@ -277,6 +297,8 @@ fn run_app<B: Backend>(
                                 {
                                     let volume = audio_state.get_volume();
                                     audio_state.set_volume((volume - 0.1).max(0.0));
+                                    // Save config after changing settings
+                                    app.save_config();
                                 }
                             }
                         }
@@ -293,6 +315,8 @@ fn run_app<B: Backend>(
                                 {
                                     let volume = audio_state.get_volume();
                                     audio_state.set_volume((volume + 0.1).min(1.0));
+                                    // Save config after changing settings
+                                    app.save_config();
                                 }
                             }
                         }
@@ -302,9 +326,21 @@ fn run_app<B: Backend>(
                     // Handle audio controls and then skip to next iteration
                     let mut input = app.world.resource_mut::<Input>();
                     match key.code {
-                        KeyCode::Char('m') => input.toggle_music = true,
-                        KeyCode::Char('+') | KeyCode::Char('=') => input.volume_up = true,
-                        KeyCode::Char('-') | KeyCode::Char('_') => input.volume_down = true,
+                        KeyCode::Char('m') => {
+                            input.toggle_music = true;
+                            // Sound/music settings will be processed by the input_system
+                            // Save config during next game tick
+                        }
+                        KeyCode::Char('+') | KeyCode::Char('=') => {
+                            input.volume_up = true;
+                            // Volume will be updated by the input_system
+                            // Save config during next game tick
+                        }
+                        KeyCode::Char('-') | KeyCode::Char('_') => {
+                            input.volume_down = true;
+                            // Volume will be updated by the input_system
+                            // Save config during next game tick
+                        }
                         _ => {}
                     }
 
@@ -398,6 +434,9 @@ fn run_app<B: Backend>(
             // Process input first
             systems::input_system(&mut app.world);
 
+            // Save config after input processing (captures audio hotkey changes)
+            app.save_config();
+
             // Then update game state
             systems::game_tick_system(&mut app.world, delta_seconds);
 
@@ -413,6 +452,10 @@ fn run_app<B: Backend>(
 
         if app.should_quit {
             info!("Game quit by user");
+
+            // Save config before exiting
+            app.save_config();
+
             return Ok(());
         }
     }

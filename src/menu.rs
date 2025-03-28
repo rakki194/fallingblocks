@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::components::{Particle, Position};
+use crate::components::{GameState, Particle, Position};
 use crate::menu_types::{Menu, MenuOption, MenuState, OptionsOption};
 use crate::particles;
 use crate::sound::{AudioState, SoundEffect};
@@ -87,7 +87,8 @@ impl MenuRenderer {
                     OptionsOption::MusicToggle => OptionsOption::SoundToggle,
                     OptionsOption::SoundToggle => OptionsOption::VolumeUp,
                     OptionsOption::VolumeUp => OptionsOption::VolumeDown,
-                    OptionsOption::VolumeDown => OptionsOption::Back,
+                    OptionsOption::VolumeDown => OptionsOption::GridToggle,
+                    OptionsOption::GridToggle => OptionsOption::Back,
                     OptionsOption::Back => OptionsOption::MusicToggle,
                 };
             }
@@ -110,7 +111,8 @@ impl MenuRenderer {
                     OptionsOption::SoundToggle => OptionsOption::MusicToggle,
                     OptionsOption::VolumeUp => OptionsOption::SoundToggle,
                     OptionsOption::VolumeDown => OptionsOption::VolumeUp,
-                    OptionsOption::Back => OptionsOption::VolumeDown,
+                    OptionsOption::GridToggle => OptionsOption::VolumeDown,
+                    OptionsOption::Back => OptionsOption::GridToggle,
                 };
             }
             MenuState::Game => {}
@@ -168,6 +170,13 @@ impl MenuRenderer {
                     if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
                         let volume = audio_state.get_volume();
                         audio_state.set_volume((volume - 0.1).max(0.0));
+                    }
+                    true
+                }
+                OptionsOption::GridToggle => {
+                    if let Some(mut game_state) = app.world.get_resource_mut::<GameState>() {
+                        // Toggle grid visibility
+                        game_state.show_grid = !game_state.show_grid;
                     }
                     true
                 }
@@ -363,6 +372,16 @@ fn render_options_menu(f: &mut Frame, area: Rect, menu: &Menu, app: &App) {
         options.push("Volume: N/A".to_string());
     }
 
+    // Get grid state from game state
+    if let Some(game_state) = app.world.get_resource::<GameState>() {
+        options.push(format!(
+            "Grid: {}",
+            if game_state.show_grid { "ON" } else { "OFF" }
+        ));
+    } else {
+        options.push("Grid: N/A".to_string());
+    }
+
     options.push("Back".to_string());
 
     let mut lines = Vec::new();
@@ -373,7 +392,8 @@ fn render_options_menu(f: &mut Frame, area: Rect, menu: &Menu, app: &App) {
                 OptionsOption::SoundToggle => 1,
                 OptionsOption::VolumeUp => 2,
                 OptionsOption::VolumeDown => 2,
-                OptionsOption::Back => 3,
+                OptionsOption::GridToggle => 3,
+                OptionsOption::Back => 4,
             } {
             Style::default().add_modifier(Modifier::REVERSED)
         } else {

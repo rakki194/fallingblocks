@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod components;
+pub mod config;
 pub mod game;
 pub mod menu;
 pub mod menu_types;

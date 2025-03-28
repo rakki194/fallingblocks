@@ -2,7 +2,7 @@
 
 A terminal-based Tetris game implemented in Rust using `ratatui` for the terminal UI and `bevy_ecs` for game logic.
 
-## Screencast
+## Gameplay
 
 ![Gameplay Demo](videos/gameplay.gif)
 
@@ -28,7 +28,7 @@ A terminal-based Tetris game implemented in Rust using `ratatui` for the termina
 Make sure you have Rust installed, then navigate to the game directory and run:
 
 ```bash
-cd tetris
+cd fallingblocks
 cargo run
 ```
 

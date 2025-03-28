@@ -107,6 +107,21 @@ impl AudioState {
             let _ = sender.try_send(AudioCommand::PlayMusic(self.music_enabled));
         }
     }
+
+    pub fn set_music_enabled(&mut self, enabled: bool) {
+        if self.music_enabled != enabled {
+            self.music_enabled = enabled;
+
+            // Send music toggle to audio thread
+            if let Some(sender) = &self.sender {
+                let _ = sender.try_send(AudioCommand::PlayMusic(self.music_enabled));
+            }
+        }
+    }
+
+    pub fn set_sound_enabled(&mut self, enabled: bool) {
+        self.sound_enabled = enabled;
+    }
 }
 
 impl Default for AudioState {
