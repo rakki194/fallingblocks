@@ -145,6 +145,17 @@ fn run_app<B: Backend>(
                     continue; // Skip the rest of the input processing for release events
                 }
 
+                // Handle key press events for hard drop
+                if key.code == KeyCode::Char('e') {
+                    let mut input = app.world.resource_mut::<Input>();
+                    input.hard_drop = true;
+                    input.hard_drop_released = false;
+                    debug!(
+                        "E key pressed, setting hard_drop = true and hard_drop_released = false"
+                    );
+                    continue; // Skip the rest of the input processing for hard drop
+                }
+
                 // First check if we need to handle game over state
                 let is_game_over = {
                     let game_state = app.world.resource::<GameState>();
