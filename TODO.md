@@ -25,6 +25,14 @@
 - [x] Tests for UI rendering
 - [x] Integration tests
 - [x] Preview of next tetromino
+- [ ] Music Implementation
+  - [x] Basic audio system setup
+  - [x] Sound effects for game actions
+  - [ ] Main menu music inspired by Game Boy Tetris
+  - [ ] In-game music with multiple variations
+  - [ ] Music that changes based on game level/progress
+  - [ ] Smooth transitions between music tracks
+  - [x] Volume controls for music and sound effects separately
 - [ ] Hold piece functionality
 - [ ] Ghost piece showing where tetromino will land
 - [ ] Additional visual polish
@@ -34,11 +42,85 @@
 - [ ] Different game modes (e.g., Marathon, Sprint, Ultra)
 - [ ] Multiplayer support
 - [ ] More advanced particle effects
-- [ ] Background music
 - [ ] Color themes
 - [ ] Accessibility options
 - [ ] Further optimize rendering for very large terminals
 - [ ] Extract constants to configuration file
-- [ ] Add proper error handling instead of unwrap()
+- [x] Add proper error handling instead of unwrap()
+- [x] Improve code organization and modularity
+- [x] Fix borrowing issues in ECS implementation
 - [ ] Improve code documentation
 - [ ] Benchmark performance and optimize hotspots
+
+# Tetris Tower Defense Mode
+
+This exciting new game mode combines classic Tetris with tower defense mechanics:
+
+- [x] Implement procedural path generation for tetrominos
+  - [x] Create algorithms for generating interesting, winding paths
+  - [ ] Ensure paths have appropriate difficulty scaling
+  - [x] Add visual indicators for the path
+- [x] Develop tower placement mechanics
+  - [x] Allow players to place towers in empty board spaces
+  - [x] Implement tower selection interface
+  - [ ] Create tower upgrade system
+- [x] Design diverse tower types
+  - [x] Basic Tower: Rapid fire, low damage
+  - [x] Cannon Tower: Slow fire rate, area damage
+  - [x] Freeze Tower: Slows down tetrominos
+  - [x] Sniper Tower: High damage to single target
+  - [x] Chain Tower: Damage jumps between adjacent tetrominos
+- [x] Create tetromino enemies with special properties
+  - [x] Regular tetrominos with standard health
+  - [x] Armored tetrominos requiring more hits
+  - [x] Fast tetrominos that move quickly
+  - [x] Boss tetrominos with special abilities
+- [x] Implement resource/economy system
+  - [x] Currency earned by defeating tetrominos
+  - [x] Tower construction and upgrade costs
+  - [x] Wave-based progression with increasing difficulty
+- [x] Design UI elements for tower defense mode
+  - [x] Tower selection and info panel
+  - [x] Resource display
+  - [x] Wave/progress indicators
+  - [x] HP/lives remaining
+- [x] Improve tower defense code organization
+  - [x] Extract systems to dedicated module
+  - [x] Fix borrowing and mutability issues
+  - [x] Implement cleaner state management
+- [ ] Fix Critical Bugs (HIGH PRIORITY)
+  - [ ] Fix enemy tetromino spawning issue - wave never starts after 10-second countdown
+  - [ ] Increase tile size to properly render enemy tetrominos
+  - [ ] Implement map scrolling with arrow keys for large tower defense maps
+- [ ] Balance gameplay mechanics
+  - [ ] Tower costs, damage, and range
+  - [ ] Enemy health and speed
+  - [ ] Currency earning rate
+  - [ ] Difficulty progression
+- [ ] Add special effects
+  - [ ] Tower attack animations
+  - [ ] Enemy damage indicators
+  - [ ] Wave completion celebrations
+  - [ ] Game over sequences
+- [ ] Improve Tower Defense Visual Appeal
+  - [ ] Widen paths to at least 4 blocks to accommodate tetrominos
+  - [ ] Create distinct visual styles for different path sections
+  - [ ] Add decorative elements around paths
+  - [ ] Improve path rendering with better colors and symbols
+  - [ ] Add directional indicators showing enemy movement flow
+  - [ ] Create more visually distinct tower representations
+  - [ ] Add background terrain/environment visuals
+  - [ ] Implement animations for tower construction and upgrades
+  - [ ] Add visual feedback for tower range when placing towers
+  - [ ] Enhance enemy health bar visualization
+  - [ ] Create starting and ending area visuals for the path
+  - [ ] Fix game board cell size - current tiles too small for tetromino enemies
+  - [ ] Create random tower buffs/debuffs during gameplay
+  - [ ] Add environmental hazards that affect both towers and enemies
+  - [ ] Add screen-shaking ultra moves for towers at max level
+  - [ ] Create psychedelic visual effects when combos reach critical levels
+- [ ] Enhance Player Experience
+  - [ ] Add mini-map for large tower defense maps
+  - [ ] Implement hotkeys for tower selection and placement
+  - [ ] Add tooltips and help system for new players
+  - [ ] Create sound effects specific to tower defense actions

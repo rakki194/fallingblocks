@@ -27,6 +27,8 @@ use ratatui::{
 pub fn render(f: &mut Frame, app: &mut App) {
     if app.menu.state == MenuState::Game {
         render_game(f, app);
+    } else if app.menu.state == MenuState::TowerDefense {
+        crate::ui_tower_defense::render_tower_defense(f, app);
     } else {
         // Update the menu renderer first
         app.menu_renderer.update();

@@ -4,12 +4,14 @@ pub enum MenuState {
     MainMenu,
     Options,
     Game,
+    TowerDefense,
 }
 
 // Menu option selection
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum MenuOption {
     NewGame,
+    TowerDefense,
     Options,
     Quit,
 }

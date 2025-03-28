@@ -25,7 +25,9 @@ use crate::components::{
 };
 use crate::game::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::particles;
-use crate::sound::{AudioState, SoundEffect};
+use crate::sound::{AudioState, MusicType, SoundEffect};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use std::time::{Duration, Instant};
 
 pub fn spawn_tetromino(world: &mut World) {
     // First, despawn any existing tetromino entities to avoid multiple tetrominos on screen
@@ -440,6 +442,9 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
         return;
     }
 
+    // Update music based on current level
+    update_music_for_level(world);
+
     // Update coyote time
     let coyote_time_expired = {
         // First get the current state
@@ -619,6 +624,33 @@ pub fn game_tick_system(world: &mut World, delta_seconds: f32) {
 
                 // Spawn initial coyote time particles to give visual feedback
                 particles::spawn_coyote_time_particles(world, position, &tetromino);
+            }
+        }
+    }
+}
+
+// Function to update background music based on the current level
+fn update_music_for_level(world: &mut World) {
+    let current_level = {
+        let game_state = world.resource::<GameState>();
+        game_state.level
+    };
+
+    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
+        // Only change music if it's currently enabled
+        if audio_state.is_music_enabled() {
+            let current_music = audio_state.get_current_music();
+            let target_music = if current_level < 5 {
+                MusicType::GameplayA
+            } else if current_level < 15 {
+                MusicType::GameplayB
+            } else {
+                MusicType::GameplayC
+            };
+
+            // Only update if music type needs to change
+            if current_music != target_music {
+                audio_state.play_music(target_music);
             }
         }
     }

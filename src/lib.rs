@@ -9,7 +9,10 @@ pub mod particles;
 pub mod screenshake;
 pub mod sound;
 pub mod systems;
+pub mod tower_defense;
+pub mod tower_defense_systems;
 pub mod ui;
+pub mod ui_tower_defense;
 
 #[cfg(test)]
 pub mod tests;

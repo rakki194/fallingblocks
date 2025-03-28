@@ -48,6 +48,7 @@ pub struct MenuRenderer {
     pub last_particle_spawn: Instant,
     pub title_colors: Vec<Color>,
     pub color_change_time: Instant,
+    pub menu: Menu,
 }
 
 impl Default for MenuRenderer {
@@ -64,6 +65,7 @@ impl Default for MenuRenderer {
                 Color::Cyan,
             ],
             color_change_time: Instant::now(),
+            menu: Menu::default(),
         }
     }
 }
@@ -77,7 +79,8 @@ impl MenuRenderer {
         match menu.state {
             MenuState::MainMenu => {
                 menu.selected_option = match menu.selected_option {
-                    MenuOption::NewGame => MenuOption::Options,
+                    MenuOption::NewGame => MenuOption::TowerDefense,
+                    MenuOption::TowerDefense => MenuOption::Options,
                     MenuOption::Options => MenuOption::Quit,
                     MenuOption::Quit => MenuOption::NewGame,
                 };
@@ -92,6 +95,7 @@ impl MenuRenderer {
                 };
             }
             MenuState::Game => {}
+            MenuState::TowerDefense => {}
         }
     }
 
@@ -100,7 +104,8 @@ impl MenuRenderer {
             MenuState::MainMenu => {
                 menu.selected_option = match menu.selected_option {
                     MenuOption::NewGame => MenuOption::Quit,
-                    MenuOption::Options => MenuOption::NewGame,
+                    MenuOption::TowerDefense => MenuOption::NewGame,
+                    MenuOption::Options => MenuOption::TowerDefense,
                     MenuOption::Quit => MenuOption::Options,
                 };
             }
@@ -114,27 +119,54 @@ impl MenuRenderer {
                 };
             }
             MenuState::Game => {}
+            MenuState::TowerDefense => {}
         }
     }
 
-    pub fn select(&mut self, menu: &mut Menu, app: &mut App) -> bool {
+    pub fn select(&mut self, menu: &mut Menu, world: &mut bevy_ecs::prelude::World) -> bool {
         match menu.state {
             MenuState::MainMenu => match menu.selected_option {
                 MenuOption::NewGame => {
                     menu.state = MenuState::Game;
                     // Play a sound effect when starting the game
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
                         if audio_state.is_sound_enabled() {
                             audio_state.play_sound(SoundEffect::LevelUp);
                         }
+                        // Start gameplay music
+                        audio_state.play_music(crate::sound::MusicType::GameplayA);
                     }
-                    app.reset();
+                    true
+                }
+                MenuOption::TowerDefense => {
+                    menu.state = MenuState::TowerDefense;
+                    // Play a sound effect when starting tower defense
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
+                        if audio_state.is_sound_enabled() {
+                            audio_state.play_sound(SoundEffect::LevelUp);
+                        }
+                        // Start tower defense music
+                        audio_state.play_music(crate::sound::MusicType::GameplayB);
+                    }
+
+                    // Initialize tower defense resources
+                    world.insert_resource(crate::tower_defense::TowerDefenseState::default());
+
+                    // Generate procedural path
+                    let mut commands = world.commands();
+                    let path = crate::tower_defense::generate_procedural_path(
+                        &mut commands,
+                        crate::game::BOARD_WIDTH,
+                        crate::game::BOARD_HEIGHT,
+                    );
+                    world.insert_resource(path);
+
                     true
                 }
                 MenuOption::Options => {
                     menu.state = MenuState::Options;
                     // Play menu navigation sound
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(audio_state) = world.get_resource_mut::<AudioState>() {
                         if audio_state.is_sound_enabled() {
                             audio_state.play_sound(SoundEffect::Move);
                         }
@@ -145,27 +177,27 @@ impl MenuRenderer {
             },
             MenuState::Options => match menu.options_selected {
                 OptionsOption::MusicToggle => {
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
                         audio_state.toggle_music();
                     }
                     true
                 }
                 OptionsOption::SoundToggle => {
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
                         // Toggle sound enabled state
                         audio_state.toggle_sound();
                     }
                     true
                 }
                 OptionsOption::VolumeUp => {
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
                         let volume = audio_state.get_volume();
                         audio_state.set_volume((volume + 0.1).min(1.0));
                     }
                     true
                 }
                 OptionsOption::VolumeDown => {
-                    if let Some(mut audio_state) = app.world.get_resource_mut::<AudioState>() {
+                    if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
                         let volume = audio_state.get_volume();
                         audio_state.set_volume((volume - 0.1).max(0.0));
                     }
@@ -173,10 +205,17 @@ impl MenuRenderer {
                 }
                 OptionsOption::Back => {
                     menu.state = MenuState::MainMenu;
+                    // Play menu back sound
+                    if let Some(audio_state) = world.get_resource_mut::<AudioState>() {
+                        if audio_state.is_sound_enabled() {
+                            audio_state.play_sound(SoundEffect::Move);
+                        }
+                    }
                     true
                 }
             },
             MenuState::Game => false,
+            MenuState::TowerDefense => false,
         }
     }
 
@@ -275,6 +314,89 @@ impl MenuRenderer {
             MenuState::MainMenu => render_main_menu_options(f, chunks[1], menu),
             MenuState::Options => render_options_menu(f, chunks[1], menu, app),
             MenuState::Game => {}
+            MenuState::TowerDefense => {}
+        }
+    }
+
+    pub fn back_to_menu(&mut self, world: &mut bevy_ecs::prelude::World) -> bool {
+        // Return to main menu
+        self.menu.state = MenuState::MainMenu;
+
+        // Switch back to main menu music
+        if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
+            audio_state.play_music(crate::sound::MusicType::MainMenu);
+        }
+
+        true
+    }
+
+    pub fn handle_menu_selection(
+        &mut self,
+        menu: &mut Menu,
+        selected_option: MenuOption,
+        world: &mut bevy_ecs::prelude::World,
+    ) {
+        match menu.state {
+            MenuState::MainMenu => {
+                // Handle main menu selection based on selected option
+                match selected_option {
+                    MenuOption::NewGame => {
+                        menu.state = MenuState::Game;
+                        // Play a sound effect when starting the game
+                        if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
+                            if audio_state.is_sound_enabled() {
+                                audio_state.play_sound(SoundEffect::LevelUp);
+                            }
+                            // Start gameplay music
+                            audio_state.play_music(crate::sound::MusicType::GameplayA);
+                        }
+                    }
+                    MenuOption::TowerDefense => {
+                        menu.state = MenuState::TowerDefense;
+                        // Play a sound effect when starting tower defense
+                        if let Some(mut audio_state) = world.get_resource_mut::<AudioState>() {
+                            if audio_state.is_sound_enabled() {
+                                audio_state.play_sound(SoundEffect::LevelUp);
+                            }
+                            // Start tower defense music
+                            audio_state.play_music(crate::sound::MusicType::GameplayB);
+                        }
+
+                        // Initialize tower defense resources
+                        world.insert_resource(crate::tower_defense::TowerDefenseState::default());
+
+                        // Generate procedural path
+                        let mut commands = world.commands();
+                        let path = crate::tower_defense::generate_procedural_path(
+                            &mut commands,
+                            crate::game::BOARD_WIDTH,
+                            crate::game::BOARD_HEIGHT,
+                        );
+                        world.insert_resource(path);
+                    }
+                    MenuOption::Options => {
+                        menu.state = MenuState::Options;
+                        // Play menu navigation sound
+                        if let Some(audio_state) = world.get_resource_mut::<AudioState>() {
+                            if audio_state.is_sound_enabled() {
+                                audio_state.play_sound(SoundEffect::Move);
+                            }
+                        }
+                    }
+                    MenuOption::Quit => {
+                        // Quitting logic would go in main.rs
+                    }
+                }
+            }
+            MenuState::Options => {
+                // Options menu selections are handled elsewhere
+            }
+            MenuState::Game => {
+                // Game state selections don't need handling here
+            }
+            MenuState::TowerDefense => {
+                // Tower defense state selections don't need handling here
+            }
         }
     }
 }
@@ -310,26 +432,58 @@ fn render_title(f: &mut Frame, area: Rect, colors: &[Color]) {
 }
 
 fn render_main_menu_options(f: &mut Frame, area: Rect, menu: &Menu) {
-    let options = vec!["New Game", "Options", "Quit"];
-    let mut lines = Vec::new();
-    for (i, option) in options.iter().enumerate() {
-        let style = if i
-            == match menu.selected_option {
-                MenuOption::NewGame => 0,
-                MenuOption::Options => 1,
-                MenuOption::Quit => 2,
-            } {
-            Style::default().add_modifier(Modifier::REVERSED)
-        } else {
-            Style::default()
+    let options = ["New Game", "Tower Defense", "Options", "Quit"];
+
+    let option_count = options.len();
+    let option_height = 1u16;
+    let total_height = option_count as u16 * option_height + (option_count as u16 - 1);
+
+    let vertical_padding = (area.height - total_height) / 2;
+
+    let options_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Length(vertical_padding),
+                Constraint::Length(option_height),
+                Constraint::Length(1), // Spacing
+                Constraint::Length(option_height),
+                Constraint::Length(1), // Spacing
+                Constraint::Length(option_height),
+                Constraint::Length(1), // Spacing
+                Constraint::Length(option_height),
+                Constraint::Length(vertical_padding),
+            ]
+            .as_ref(),
+        )
+        .split(area);
+
+    // Render options
+    for (i, &option_text) in options.iter().enumerate() {
+        let option_idx = i * 2 + 1; // Skip padding and spacing constraints
+
+        let is_selected = match i {
+            0 => matches!(menu.selected_option, MenuOption::NewGame),
+            1 => matches!(menu.selected_option, MenuOption::TowerDefense),
+            2 => matches!(menu.selected_option, MenuOption::Options),
+            3 => matches!(menu.selected_option, MenuOption::Quit),
+            _ => false,
         };
-        lines.push(Line::from(vec![Span::styled(option.to_string(), style)]));
+
+        let style = if is_selected {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let option = Paragraph::new(option_text)
+            .style(style)
+            .alignment(Alignment::Center);
+
+        f.render_widget(option, options_layout[option_idx]);
     }
-    let text = Text::from(lines);
-    let paragraph = Paragraph::new(text)
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true });
-    f.render_widget(paragraph, area);
 }
 
 fn render_options_menu(f: &mut Frame, area: Rect, menu: &Menu, app: &App) {
@@ -404,6 +558,7 @@ fn render_menu_particles(f: &mut Frame, renderer: &MenuRenderer) {
     }
 }
 
+#[allow(dead_code)]
 fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
     let x = r.x + r.width.saturating_sub(width) / 2;
     let y = r.y + r.height.saturating_sub(height) / 2;

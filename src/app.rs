@@ -33,7 +33,12 @@ impl App {
     pub fn new() -> Self {
         let mut world = World::new();
         world.insert_resource(Time::new());
-        world.insert_resource(AudioState::new());
+
+        // Initialize audio and start playing menu music
+        let mut audio_state = AudioState::new();
+        audio_state.play_music(crate::sound::MusicType::MainMenu);
+        world.insert_resource(audio_state);
+
         world.insert_resource(Input::default());
         world.insert_resource(GameState::default());
         world.insert_resource(ScreenShake::default());
@@ -125,6 +130,11 @@ impl App {
             .get_resource::<AudioState>()
             .map(|audio| audio.get_volume());
 
+        let audio_music_enabled = self
+            .world
+            .get_resource::<AudioState>()
+            .map(|audio| audio.is_music_enabled());
+
         // Save current menu state
         let current_menu_state = self.menu.state.clone();
 
@@ -154,6 +164,21 @@ impl App {
         if let Some(vol) = audio_vol {
             audio_state.set_volume(vol);
         }
+
+        // Restore music enabled setting
+        if let Some(music_enabled) = audio_music_enabled {
+            if !music_enabled {
+                audio_state.toggle_music(); // Toggle off if it was previously off
+            }
+        }
+
+        // Set appropriate music based on game state
+        if current_menu_state == crate::menu_types::MenuState::Game {
+            audio_state.play_music(crate::sound::MusicType::GameplayA);
+        } else {
+            audio_state.play_music(crate::sound::MusicType::MainMenu);
+        }
+
         self.world.insert_resource(audio_state);
 
         // Reset menu renderer while preserving the menu state
