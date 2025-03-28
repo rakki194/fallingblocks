@@ -2,6 +2,10 @@
 
 A terminal-based Tetris game implemented in Rust using `ratatui` for the terminal UI and `bevy_ecs` for game logic.
 
+## Screencast
+
+![Gameplay Demo](videos/gameplay.gif)
+
 ## Features
 
 - Classic Tetris gameplay

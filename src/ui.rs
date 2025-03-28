@@ -89,8 +89,8 @@ fn render_game(f: &mut Frame, app: &mut App) {
     // Apply screen shake to the entire frame
     let original_area = f.area();
     let shake_area = Rect {
-        x: (original_area.x as i16 + shake_x) as u16,
-        y: (original_area.y as i16 + shake_y) as u16,
+        x: (original_area.x as i16 + shake_x).clamp(0, original_area.width as i16) as u16,
+        y: (original_area.y as i16 + shake_y).clamp(0, original_area.height as i16) as u16,
         width: original_area.width,
         height: original_area.height,
     };
